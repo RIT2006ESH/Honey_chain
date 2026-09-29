@@ -213,7 +213,7 @@ export function AppProvider({ children }) {
   const handleProcessSubmit = useCallback(async (e, batchId) => {
     e.preventDefault();
     try {
-      await fetch(`${API_BASE}/api/batches/${batchId}/process`, {
+      const res = await fetch(`${API_BASE}/api/batches/${batchId}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,9 +221,16 @@ export function AppProvider({ children }) {
           qtyProcessed: e.target.elements.qtyProcessed.value
         })
       });
-      showNotification(`Batch ${batchId} processed!`);
-      fetchBatches();
-    } catch (err) { /* no-op */ }
+      const data = await res.json();
+      if (data.ok) {
+        showNotification(`Batch ${batchId} processed!`);
+        fetchBatches();
+      } else {
+        showNotification(data.error || `Could not process batch ${batchId}`);
+      }
+    } catch (err) {
+      showNotification('Could not process batch. Is backend running?');
+    }
   }, [fetchBatches, showNotification]);
 
   const handlePackageSubmit = useCallback(async (batchId) => {
@@ -233,6 +240,27 @@ export function AppProvider({ children }) {
       fetchBatches();
     } catch (err) { /* no-op */ }
   }, [fetchBatches, showNotification]);
+
+  // Beekeeper hands a harvested batch over to the processing facility
+  const sendToProcessor = useCallback(async (batchId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/batches/${batchId}/handoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: (currentUser && currentUser.name) || undefined })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showNotification(`${batchId} sent to the processor`);
+        fetchBatches();
+        return true;
+      }
+      showNotification(data.error || 'Could not send batch to the processor');
+    } catch (err) {
+      showNotification('Could not send batch. Is backend running?');
+    }
+    return false;
+  }, [currentUser, fetchBatches, showNotification]);
 
   const handleAddHive = useCallback(async (hiveData) => {
     try {
@@ -245,7 +273,7 @@ export function AppProvider({ children }) {
       if (data.ok && data.hive) {
         const h = data.hive;
         setHives(prev => ({ ...prev, [h.hiveId]: mapApiHive(h) }));
-        showNotification(`${h.hiveId} submitted — awaiting admin approval`);
+        showNotification(`${h.hiveId} submitted — awaiting review`);
         return h.hiveId;
       }
       showNotification(data.error || 'Failed to register hive');
@@ -255,7 +283,7 @@ export function AppProvider({ children }) {
     return null;
   }, [showNotification]);
 
-  // Admin review of a hive registration request (approve / reject)
+  // Review of a hive registration request (approve / reject)
   const reviewHive = useCallback(async (hiveId, decision) => {
     try {
       const res = await fetch(`${API_BASE}/api/iot/hives/${hiveId}/${decision}`, {
@@ -265,7 +293,7 @@ export function AppProvider({ children }) {
           'x-user-role': (currentUser && currentUser.role) || ''
         },
         body: JSON.stringify({
-          reviewer: (currentUser && currentUser.name) || 'Admin',
+          reviewer: (currentUser && currentUser.name) || 'Reviewer',
           note: decision === 'approve' ? 'Approved from Hive Monitor' : 'Rejected from Hive Monitor'
         })
       });
@@ -380,6 +408,7 @@ export function AppProvider({ children }) {
     productionRange, setProductionRange,
     handleLogin, handleRegisterHarvest, handleVerifyBatch,
     handleQualitySubmit, handleProcessSubmit, handlePackageSubmit, handleAddHive,
+    sendToProcessor,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

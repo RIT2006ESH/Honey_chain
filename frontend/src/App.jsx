@@ -40,11 +40,6 @@ import BeekeeperAlerts from './pages/beekeeper/BeekeeperAlerts';
 import BeekeeperEarnings from './pages/beekeeper/BeekeeperEarnings';
 import BeekeeperProfile from './pages/beekeeper/BeekeeperProfile';
 
-import UsersManagement from './pages/admin/UsersManagement';
-import ActivityLog from './pages/admin/ActivityLog';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminReports from './pages/admin/AdminReports';
-
 const VIEWS = {
   overview: Overview,
   monitor: HiveMonitor,
@@ -72,10 +67,6 @@ const VIEWS = {
   'bk-alerts': BeekeeperAlerts,
   earnings: BeekeeperEarnings,
   'bk-profile': BeekeeperProfile,
-  users: UsersManagement,
-  activity: ActivityLog,
-  settings: AdminSettings,
-  reports: AdminReports,
 };
 
 function NotificationBanner() {

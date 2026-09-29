@@ -94,22 +94,22 @@ export const latestBatch = {
 // ---- New mock datasets for previously-placeholder pages ----
 
 export const mockUsers = [
-  { id: 'U001', name: 'System Admin', email: 'admin@honeychain.demo', role: 'ADMIN', cluster: 'All Clusters', status: 'Active', joined: '02 Jan 2026' },
   { id: 'U002', name: 'Ganesh Pawar', email: 'beekeeper@honeychain.demo', role: 'BEEKEEPER', cluster: 'Satara', status: 'Active', joined: '12 Jan 2026' },
   { id: 'U003', name: 'Ramesh Shinde', email: 'ramesh.shinde@honeychain.demo', role: 'BEEKEEPER', cluster: 'Pune / Solapur', status: 'Active', joined: '18 Jan 2026' },
   { id: 'U004', name: 'Suresh More', email: 'suresh.more@honeychain.demo', role: 'BEEKEEPER', cluster: 'Kolhapur', status: 'Invited', joined: '02 Feb 2026' },
-  { id: 'U005', name: 'Dr. Anita Kulkarni', email: 'officer@honeychain.demo', role: 'QUALITY_OFFICER', cluster: 'Satara Lab', status: 'Active', joined: '05 Jan 2026' },
+  { id: 'U005', name: 'Dr. Anita Kulkarni', email: 'tester@honeychain.demo', role: 'TESTER', cluster: 'Satara Lab', status: 'Active', joined: '05 Jan 2026' },
   { id: 'U006', name: 'Vikram Deshmukh', email: 'processor@honeychain.demo', role: 'PROCESSOR', cluster: 'Satara Processing Unit', status: 'Active', joined: '08 Jan 2026' },
+  { id: 'U007', name: 'Nashik Packing Works', email: 'manufacturer@honeychain.demo', role: 'MANUFACTURER', cluster: 'Nashik', status: 'Active', joined: '14 Jan 2026' },
 ];
 
 export const mockActivityLog = [
   { id: 'A001', type: 'BATCH', actor: 'Ganesh Pawar', message: 'Registered new harvest batch HC-MH-2026-00124', time: '12 minutes ago', level: 'INFO' },
   { id: 'A002', type: 'HIVE', actor: 'System', message: 'Hive H002 temperature exceeded 37°C threshold', time: '38 minutes ago', level: 'WARNING' },
   { id: 'A003', type: 'QUALITY', actor: 'Dr. Anita Kulkarni', message: 'Approved NMR purity test for batch KVIC-HC-2026-0417', time: '1 hour ago', level: 'SUCCESS' },
-  { id: 'A004', type: 'USER', actor: 'System Admin', message: 'Invited Suresh More as Beekeeper (Kolhapur)', time: '3 hours ago', level: 'INFO' },
+  { id: 'A004', type: 'USER', actor: 'Ganesh Pawar', message: 'Registered new hive H005 (Satara)', time: '3 hours ago', level: 'INFO' },
   { id: 'A005', type: 'BATCH', actor: 'Vikram Deshmukh', message: 'Marked batch KVIC-HC-2026-0417 as packaged, QR generated', time: '5 hours ago', level: 'SUCCESS' },
   { id: 'A006', type: 'HIVE', actor: 'System', message: 'Hive H004 battery dropped below 20%', time: '1 day ago', level: 'WARNING' },
-  { id: 'A007', type: 'USER', actor: 'System Admin', message: 'System Admin signed in', time: '1 day ago', level: 'INFO' },
+  { id: 'A007', type: 'USER', actor: 'Dr. Anita Kulkarni', message: 'Dr. Anita Kulkarni signed in', time: '1 day ago', level: 'INFO' },
 ];
 
 export const shopProducts = [

@@ -781,17 +781,12 @@
   font-weight: 700;
 }
 
-.badge-admin {
-  background: var(--amber-gold-gradient-soft, rgba(245, 158, 11, 0.15));
-  color: var(--amber-400);
-}
-
 .badge-bk {
   background: var(--emerald-bg);
   color: var(--emerald-400);
 }
 
-.badge-qo {
+.badge-test {
   background: rgba(96, 165, 250, 0.12);
   color: #60a5fa;
 }
@@ -799,5 +794,10 @@
 .badge-proc {
   background: rgba(251, 146, 60, 0.12);
   color: #fb923c;
+}
+
+.badge-mfr {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
 }
 

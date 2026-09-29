@@ -11,13 +11,24 @@ const EXTRACTION_UNITS = [
   'Flow Hive Gravity Drain System',
 ];
 
+const FILTRATION_METHODS = [
+  'Micro-Mesh Sediment Filtration (200 µm)',
+  'Fine Cloth Strain',
+  'Coarse Strain then Fine Cloth',
+  'Pre-filtered — no additional filtration',
+];
+
 export default function ProcessingLog() {
-  const { sharedBatches, switchView, showNotification } = useApp();
+  const { sharedBatches, switchView, showNotification, fetchBatches } = useApp();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState('');
+  const [result, setResult] = useState(null);
 
-  const processing = sharedBatches.filter(b => b.status === 'PROCESSED' || b.status === 'QUALITY_VERIFIED' || b.status === 'CERTIFIED');
+  const processing = sharedBatches.filter(b =>
+    ['HARVEST_CREATED', 'HARVEST_VERIFIED', 'QUALITY_VERIFIED', 'CERTIFIED', 'PROCESSED'].includes(b.status)
+  );
+  const records = sharedBatches.filter(b => b.production);
 
   const [form, setForm] = useState({
     extractionUnit: '',
@@ -26,6 +37,8 @@ export default function ProcessingLog() {
     poolingNote: '',
     temperature: '',
     duration: '',
+    filtrationMethod: '',
+    settlingHours: '',
     notes: '',
   });
 
@@ -38,29 +51,79 @@ export default function ProcessingLog() {
     if (!selectedBatch) return;
     setSubmitting(true);
 
+    const payload = {
+      extractionUnit: form.extractionUnit,
+      inputQuantity: parseFloat(form.inputQty) || batch?.quantity || 0,
+      outputQuantity: parseFloat(form.outputQty) || 0,
+      poolingNote: form.poolingNote,
+      processingTemp: form.temperature ? parseFloat(form.temperature) : null,
+      durationMinutes: form.duration ? parseInt(form.duration) : null,
+      filtrationMethod: form.filtrationMethod,
+      settlingHours: form.settlingHours ? parseFloat(form.settlingHours) : null,
+      notes: form.notes,
+      processedAt: new Date().toISOString(),
+      processor: 'Satara Processing Unit',
+    };
+
     try {
-      await fetch(`${API_BASE}/api/batches/${selectedBatch}/process`, {
+      const res = await fetch(`${API_BASE}/api/batches/${selectedBatch}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          extractionUnit: form.extractionUnit,
-          inputQuantity: parseFloat(form.inputQty) || batch?.quantity || 0,
-          outputQuantity: parseFloat(form.outputQty) || 0,
-          poolingNote: form.poolingNote,
-          processingTemp: form.temperature ? parseFloat(form.temperature) : null,
-          durationMinutes: form.duration ? parseInt(form.duration) : null,
-          notes: form.notes,
-          processedAt: new Date().toISOString(),
-          processor: 'Satara Processing Unit',
-        }),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showNotification(data.error || `Could not log processing for ${selectedBatch}`);
+        return;
+      }
+
+      if (form.filtrationMethod || form.settlingHours) {
+        try {
+          await fetch(`${API_BASE}/api/processing-step`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              batchId: selectedBatch,
+              step: 'Filtration & Settling',
+              notes: [
+                form.filtrationMethod,
+                form.settlingHours ? `settled ${form.settlingHours}h` : null,
+              ].filter(Boolean).join(' · '),
+            }),
+          });
+        } catch (err) { /* step record is best-effort */ }
+      }
+
+      const prod = data.batch.production || {};
+      setResult({
+        batchId: selectedBatch,
+        productionBatchId: data.batch.productionBatchId || null,
+        processedAt: prod.processedAt || payload.processedAt,
+        location: prod.location || payload.processor,
+        outputQty: payload.outputQuantity,
+        filtration: form.filtrationMethod || null,
+        settlingHours: form.settlingHours || null,
       });
       setSubmitted(true);
       showNotification(`Processing logged for ${selectedBatch}`);
+      fetchBatches();
     } catch (e) {
-      setSubmitted(true);
+      showNotification('Could not log processing. Is backend running?');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setForm({ extractionUnit: '', inputQty: '', outputQty: '', poolingNote: '', temperature: '', duration: '', filtrationMethod: '', settlingHours: '', notes: '' });
+    setResult(null);
+  };
+
+  const fmtDate = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -78,14 +141,30 @@ export default function ProcessingLog() {
           </div>
           <h3 className="result-title" style={{ color: 'var(--emerald-400)' }}>Processing Logged</h3>
           <p className="result-sub">
-            {selectedBatch} — extraction complete. Ready for packaging.
+            {selectedBatch} — extraction complete and logged to the blockchain.
           </p>
+          {result && (
+            <div className="notice" style={{ maxWidth: '560px', margin: '12px auto 0', textAlign: 'left' }}>
+              <div className="grid-2" style={{ gap: '8px 16px' }}>
+                <div><span style={{ color: 'var(--text-dim)' }}>Production batch: </span><strong style={{ color: 'var(--amber-400)' }}>{result.productionBatchId || '—'}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Output: </span><strong>{result.outputQty} kg</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Processed at: </span><strong>{fmtDate(result.processedAt)}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Location: </span><strong>{result.location}</strong></div>
+                {result.filtration && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ color: 'var(--text-dim)' }}>Filtration: </span>
+                    <strong>{result.filtration}{result.settlingHours ? ` · settled ${result.settlingHours}h` : ''}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="result-actions">
-            <button onClick={() => switchView('packaging')} className="btn btn-gold">
-              Proceed to Packaging <ArrowRight size={14} />
+            <button onClick={() => { setSubmitted(false); resetForm(); }} className="btn btn-gold">
+              Log Another <ArrowRight size={14} />
             </button>
-            <button onClick={() => { setSubmitted(false); setForm({ extractionUnit: '', inputQty: '', outputQty: '', poolingNote: '', temperature: '', duration: '', notes: '' }); }} className="btn btn-soft">
-              Log Another
+            <button onClick={() => switchView('proc-incoming')} className="btn btn-soft">
+              Back to Incoming
             </button>
           </div>
         </div>
@@ -141,6 +220,21 @@ export default function ProcessingLog() {
               </div>
             </div>
 
+            <div className="section-title">Filtration &amp; Settling</div>
+            <div className="grid-2">
+              <div className="field">
+                <label className="field-label">Filtration Method</label>
+                <select value={form.filtrationMethod} onChange={e => update('filtrationMethod', e.target.value)} className="select">
+                  <option value="">Select method...</option>
+                  {FILTRATION_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label className="field-label">Settling Time (hours)</label>
+                <input type="number" min="0" step="0.5" value={form.settlingHours} onChange={e => update('settlingHours', e.target.value)} placeholder="e.g. 24" className="input" />
+              </div>
+            </div>
+
             <div className="field mt-16">
               <label className="field-label">Notes</label>
               <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} placeholder="Any observations during processing..." className="textarea" />
@@ -151,6 +245,41 @@ export default function ProcessingLog() {
               {submitting ? 'Logging Processing...' : 'Complete Processing & Log to Blockchain'}
             </button>
           </form>
+        </div>
+      )}
+
+      {records.length > 0 && (
+        <div className="glass-card mt-16">
+          <div className="panel-title" style={{ marginBottom: '10px' }}>Processing Records</div>
+          <div className="table-scroll">
+            <table className="hc-table">
+              <thead>
+                <tr>
+                  {['Batch ID', 'Production Batch', 'Processed At', 'Location', 'Input → Output', 'Filtration'].map(h => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map(b => (
+                  <tr key={b.id}>
+                    <td style={{ fontWeight: 600, color: 'var(--amber-400)' }}>{b.id}</td>
+                    <td>{b.productionBatchId || '—'}</td>
+                    <td className="muted">{fmtDate(b.production.processedAt)}</td>
+                    <td>{b.production.location || '—'}</td>
+                    <td className="muted">
+                      {b.production.inputQuantity ?? b.quantity ?? '—'} kg → {b.production.outputQuantity ?? '—'} kg
+                    </td>
+                    <td className="muted">
+                      {b.production.filtration
+                        ? `${b.production.filtration.method}${b.production.filtration.settlingHours != null ? ` · ${b.production.filtration.settlingHours}h` : ''}`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>

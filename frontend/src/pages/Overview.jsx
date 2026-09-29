@@ -45,7 +45,7 @@ export default function Overview() {
     return { total: list.length, healthy, avgScore, alerts, avgBattery };
   }, [hives]);
 
-  const verifiedBatches = allBatches.filter(b => b.status === 'CERTIFIED' || b.status === 'PROCESSED' || b.status === 'PACKAGED' || b.status === 'DISPATCHED');
+  const verifiedBatches = allBatches.filter(b => b.status === 'CERTIFIED' || b.status === 'QA_APPROVED' || b.status === 'PROCESSED' || b.status === 'PACKAGED' || b.status === 'DISPATCHED');
 
   const recentBatches = useMemo(() => {
     return [...allBatches]

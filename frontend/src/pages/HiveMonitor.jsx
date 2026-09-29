@@ -31,7 +31,7 @@ export default function HiveMonitor() {
   const [adding, setAdding] = useState(false);
   const [reviewingId, setReviewingId] = useState(null);
 
-  const isApprover = currentUser?.role === 'ADMIN';
+  const isApprover = !!currentUser;
   const activeApproval = curHive?.approvalStatus || 'APPROVED';
 
   const hiveList = useMemo(() => Object.entries(hives).map(([id, h]) => ({
@@ -106,7 +106,7 @@ export default function HiveMonitor() {
 
           {pendingList.length > 0 && (
             <div className={`notice ${isApprover ? 'notice-warn' : 'notice-info'}`} style={{ fontSize: '12px' }}>
-              {pendingList.length} registration{pendingList.length > 1 ? 's' : ''} awaiting admin approval
+              {pendingList.length} registration{pendingList.length > 1 ? 's' : ''} awaiting review
             </div>
           )}
 
@@ -141,7 +141,7 @@ export default function HiveMonitor() {
               <button className="btn-close-modal" onClick={() => setShowAddModal(false)}><X size={16} /></button>
               <h3 className="modal-title">Register New Hive</h3>
               <p className="muted" style={{ margin: '0 0 20px' }}>
-                The hive is queued for admin approval — sensor data goes live only after it is accepted.
+                The hive is queued for review — sensor data goes live only after it is accepted.
               </p>
               <form onSubmit={handleAddSubmit} className="flex-col" style={{ gap: '14px' }}>
                 <div>
@@ -193,7 +193,7 @@ export default function HiveMonitor() {
 
         {/* MAIN CONTENT AREA */}
         <div className="monitor-main-area">
-          {/* Admin: registration approval queue */}
+          {/* Registration approval queue (any signed-in role) */}
           {isApprover && (
             <ApprovalQueue
               pending={pendingList}
@@ -246,7 +246,7 @@ export default function HiveMonitor() {
             <>
               {pendingList.length > 0 && (
                 <div className="notice notice-warn" style={{ fontSize: '12.5px' }}>
-                  {pendingList.length} hive{pendingList.length > 1 ? 's' : ''} awaiting admin approval — hidden from fleet view until accepted.
+                  {pendingList.length} hive{pendingList.length > 1 ? 's' : ''} awaiting review — hidden from fleet view until accepted.
                 </div>
               )}
               <FleetGrid hives={liveHives} onSelectHive={goToHive} />

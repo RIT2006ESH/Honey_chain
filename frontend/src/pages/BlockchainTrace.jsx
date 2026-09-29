@@ -9,10 +9,13 @@ import CertificateModal from '../components/CertificateModal';
 const STAGE_META = {
   HARVEST_CREATED: { label: 'Harvest', icon: '🐝', color: 'var(--amber-400)', stage: 1 },
   HARVEST_VERIFIED: { label: 'Verified', icon: '✓', color: 'var(--emerald-400)', stage: 2 },
-  QUALITY_VERIFIED: { label: 'Lab Test', icon: '🔬', color: '#60a5fa', stage: 3 },
-  PROCESSED: { label: 'Processing', icon: '⚙', color: '#a78bfa', stage: 4 },
-  PACKAGED: { label: 'Packaging', icon: '📦', color: '#f472b6', stage: 5 },
-  BatchCertification: { label: 'Certified', icon: '🏅', color: 'var(--emerald-400)', stage: 6 },
+  HANDOFF_TO_PROCESSOR: { label: 'Sent to Processor', icon: '🚚', color: 'var(--amber-400)', stage: 3 },
+  RECEIVED_BY_PROCESSOR: { label: 'Received', icon: '🏭', color: '#a78bfa', stage: 4 },
+  QUALITY_VERIFIED: { label: 'Lab Test', icon: '🔬', color: '#60a5fa', stage: 5 },
+  PROCESSED: { label: 'Processing', icon: '⚙', color: '#a78bfa', stage: 6 },
+  PACKAGED: { label: 'Packaging', icon: '📦', color: '#f472b6', stage: 7 },
+  DISPATCHED: { label: 'Dispatched', icon: '🚚', color: '#60a5fa', stage: 8 },
+  BatchCertification: { label: 'Certified', icon: '🏅', color: 'var(--emerald-400)', stage: 9 },
 };
 
 const MOCK_CHECKPOINTS = {
@@ -36,7 +39,7 @@ const MOCK_CHECKPOINTS = {
         notes: 'Unheated manual comb uncapping and centrifugal spin. 12 frames harvested.',
       },
       {
-        stage: 'HARVEST_VERIFIED', actor: 'Dr. Anita Kulkarni', role: 'Quality Officer',
+        stage: 'HARVEST_VERIFIED', actor: 'Dr. Anita Kulkarni', role: 'Tester',
         date: '2025-05-11T09:15:00Z', location: 'Satara Quality Lab, Maharashtra',
         hash: '0x3ba7e0291df445ea1b8c3d2e5f6a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a',
         prevHash: '0x8f2c19a0e14d5cb792e3f1a8b4c6d0e5f7a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5',
@@ -44,7 +47,7 @@ const MOCK_CHECKPOINTS = {
         notes: 'Colony health verified. No signs of disease. Harvest quality confirmed.',
       },
       {
-        stage: 'QUALITY_VERIFIED', actor: 'Dr. Anita Kulkarni', role: 'Quality Officer',
+        stage: 'QUALITY_VERIFIED', actor: 'Dr. Anita Kulkarni', role: 'Tester',
         date: '2025-05-12T10:30:00Z', location: 'National Bee Board Referral Lab',
         hash: '0x9e14d5c8821034bc2da7f8e9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9',
         prevHash: '0x3ba7e0291df445ea1b8c3d2e5f6a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a',
@@ -92,15 +95,24 @@ function buildCheckpointsFromBatch(batch) {
 
   const stageMap = {
     'Harvest created': { stage: 'HARVEST_CREATED', actor: beekeeper, role: 'Beekeeper', location: hiveLabel },
-    'Harvest verified': { stage: 'HARVEST_VERIFIED', actor: 'Quality Officer', role: 'Quality Officer', location: 'Regional Quality Lab' },
-    'Quality test passed': { stage: 'QUALITY_VERIFIED', actor: 'Quality Officer', role: 'Quality Officer', location: 'FSSAI Accredited Lab' },
-    'Processing completed': { stage: 'PROCESSED', actor: 'Vikram Deshmukh', role: 'Processor', location: 'Cold Processing Unit' },
-    'Package registered': { stage: 'PACKAGED', actor: 'Vikram Deshmukh', role: 'Processor', location: 'Packaging Facility' },
+    'Harvest verified': { stage: 'HARVEST_VERIFIED', actor: 'Tester', role: 'Tester', location: 'Regional Quality Lab' },
+    'Sent to processor': { stage: 'HANDOFF_TO_PROCESSOR', actor: beekeeper, role: 'Beekeeper', location: hiveLabel },
+    'Received by processor': { stage: 'RECEIVED_BY_PROCESSOR', actor: 'Processor', role: 'Processor', location: batch.received?.receiver || 'Processing Unit' },
+    'Quality test passed': { stage: 'QUALITY_VERIFIED', actor: 'Tester', role: 'Tester', location: batch.qualityTest?.labName || 'FSSAI Accredited Lab' },
+    'Processing completed': { stage: 'PROCESSED', actor: 'Processor', role: 'Processor', location: batch.processing?.processor || batch.processing?.center || batch.production?.location || 'Cold Processing Unit' },
+    'Package registered': { stage: 'PACKAGED', actor: 'Manufacturer', role: 'Manufacturer', location: batch.packaging?.location || batch.production?.packagedLocation || 'Packing Facility' },
     'QR generated': null,
   };
 
+  const dispatchMapping = {
+    stage: 'DISPATCHED',
+    actor: 'Manufacturer',
+    role: 'Manufacturer',
+    location: batch.dispatch?.destination || 'Distribution Hub',
+  };
+
   events.forEach((tx, i) => {
-    const mapped = stageMap[tx.event];
+    const mapped = stageMap[tx.event] || (typeof tx.event === 'string' && tx.event.startsWith('Dispatched') ? dispatchMapping : undefined);
     if (mapped) {
       checkpoints.push({
         ...mapped,
@@ -406,8 +418,8 @@ export default function BlockchainTrace() {
                         <div className="muted flex gap-12 flex-wrap">
                           <span className="flex" style={{ gap: '4px' }}><User size={12} /> {cp.actor}</span>
                           <span className="pill pill-sm" style={{
-                            background: cp.role === 'Beekeeper' ? 'rgba(52,211,153,0.1)' : cp.role === 'Quality Officer' ? 'rgba(96,165,250,0.1)' : cp.role === 'Processor' ? 'rgba(167,139,250,0.1)' : 'rgba(148,163,184,0.1)',
-                            color: cp.role === 'Beekeeper' ? 'var(--emerald-400)' : cp.role === 'Quality Officer' ? '#60a5fa' : cp.role === 'Processor' ? '#a78bfa' : 'var(--text-muted)',
+                            background: cp.role === 'Beekeeper' ? 'rgba(52,211,153,0.1)' : cp.role === 'Tester' ? 'rgba(96,165,250,0.1)' : cp.role === 'Processor' ? 'rgba(167,139,250,0.1)' : cp.role === 'Manufacturer' ? 'rgba(244,114,182,0.1)' : 'rgba(148,163,184,0.1)',
+                            color: cp.role === 'Beekeeper' ? 'var(--emerald-400)' : cp.role === 'Tester' ? '#60a5fa' : cp.role === 'Processor' ? '#a78bfa' : cp.role === 'Manufacturer' ? '#f472b6' : 'var(--text-muted)',
                           }}>{cp.role}</span>
                           <span className="flex" style={{ gap: '4px' }}><Clock size={12} /> {new Date(cp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                           <span className="flex" style={{ gap: '4px' }}><MapPin size={12} /> {cp.location}</span>

@@ -19,10 +19,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
 
   const demoAccounts = [
-    { role: 'Admin', email: 'admin@honeychain.demo', badge: 'Full Access', icon: <Award size={14} />, badgeClass: 'badge-admin' },
     { role: 'Beekeeper', email: 'beekeeper@honeychain.demo', badge: 'Manage Hives & Batches', icon: <User size={14} />, badgeClass: 'badge-bk' },
-    { role: 'Quality Officer', email: 'officer@honeychain.demo', badge: 'Verify & Approve', icon: <ShieldCheck size={14} />, badgeClass: 'badge-qo' },
     { role: 'Processor', email: 'processor@honeychain.demo', badge: 'Process & Package', icon: <Cog size={14} />, badgeClass: 'badge-proc' },
+    { role: 'Tester', email: 'tester@honeychain.demo', badge: 'Verify & Approve', icon: <ShieldCheck size={14} />, badgeClass: 'badge-test' },
+    { role: 'Manufacturer', email: 'manufacturer@honeychain.demo', badge: 'Pack & Dispatch', icon: <Award size={14} />, badgeClass: 'badge-mfr' },
   ];
 
   const handleCopyEmail = (e, email) => {

@@ -9,6 +9,13 @@ const STATUS_STYLES = {
   DISPATCHED: { bg: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: 'rgba(96, 165, 250, 0.3)', label: 'Dispatched', icon: <Truck size={12} /> },
 };
 
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export default function Inventory() {
   const { switchView, setBatchIdInput } = useApp();
   const [inventory, setInventory] = useState([]);
@@ -106,7 +113,7 @@ export default function Inventory() {
             <table className="hc-table">
               <thead>
                 <tr>
-                  {['Batch ID', 'Honey Type', 'Qty', 'Beekeeper', 'Status', 'QR Code', ''].map(h => (
+                  {['Batch ID', 'Honey Type', 'Qty', 'Package', 'Production Batch', 'Beekeeper', 'Status', 'QR Code', ''].map(h => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -119,6 +126,22 @@ export default function Inventory() {
                       <td style={{ fontWeight: 600, color: 'var(--amber-400)' }}>{item.id}</td>
                       <td>{item.honeyType}</td>
                       <td>{item.quantity} kg</td>
+                      <td>
+                        {item.packaging ? (
+                          <div>
+                            <div style={{ fontWeight: 600 }}>
+                              {item.packaging.jarCount} × {item.packaging.jarWeight}
+                              {item.packaging.finalQuantityKg != null ? ` (${item.packaging.finalQuantityKg} kg)` : ''}
+                            </div>
+                            <div className="muted" style={{ fontSize: '11px' }}>
+                              {fmtDate(item.packaging.sealDate || item.packaging.packagedAt)} · {item.packaging.location || '—'}
+                            </div>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="muted" style={{ fontWeight: 600 }}>
+                        {item.packaging?.packagedBatchId || item.productionBatchId || '—'}
+                      </td>
                       <td className="muted">{item.beekeeper}</td>
                       <td>
                         <span className="pill" style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>

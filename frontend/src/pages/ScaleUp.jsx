@@ -88,8 +88,8 @@ const TECH_STACK = [
   },
   {
     layer: 'Access Layer', icon: <Smartphone size={18} />, color: 'var(--rose-400)',
-    techs: ['React SPA (Beekeeper + Admin)', 'QR Code Consumer Portal', 'REST API (Express.js)', 'Role-Based Access Control'],
-    purpose: 'Web dashboard for beekeepers, quality officers, processors, and consumers via QR scan.',
+    techs: ['React SPA (Role-Based Dashboards)', 'QR Code Consumer Portal', 'REST API (Express.js)', 'Role-Based Access Control'],
+    purpose: 'Web dashboard for beekeepers, processors, testers, manufacturers, and consumers via QR scan.',
   },
   {
     layer: 'Integration Layer', icon: <Globe size={18} />, color: 'var(--orange-400)',

@@ -6,7 +6,9 @@ const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 const STATUS_STYLES = {
   HARVEST_CREATED: { bg: 'rgba(251, 191, 36, 0.12)', color: 'var(--amber-400)', border: 'rgba(251, 191, 36, 0.3)', label: 'Awaiting Verification' },
-  HARVEST_VERIFIED: { bg: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: 'rgba(96, 165, 250, 0.3)', label: 'Ready for Lab Test' },
+  HARVEST_VERIFIED: { bg: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: 'rgba(96, 165, 250, 0.3)', label: 'Awaiting Handoff to Processor' },
+  PROCESSED: { bg: 'rgba(167, 139, 250, 0.12)', color: '#a78bfa', border: 'rgba(167, 139, 250, 0.3)', label: 'Received from Processor' },
+  QA_APPROVED: { bg: 'var(--emerald-bg)', color: 'var(--emerald-400)', border: 'var(--emerald-border)', label: 'Approved for Manufacturing' },
   CERTIFIED: { bg: 'var(--emerald-bg)', color: 'var(--emerald-400)', border: 'var(--emerald-border)', label: 'Certified' },
   REJECTED: { bg: 'var(--rose-bg)', color: 'var(--rose-400)', border: 'var(--rose-border)', label: 'Rejected' },
 };
@@ -15,10 +17,9 @@ export default function PendingVerification() {
   const { sharedBatches, switchView } = useApp();
   const [expanded, setExpanded] = useState(null);
   const [verifying, setVerifying] = useState(null);
-  const [, setTesting] = useState(null);
 
   const pending = sharedBatches.filter(b =>
-    b.status === 'HARVEST_CREATED' || b.status === 'HARVEST_VERIFIED'
+    b.status === 'HARVEST_CREATED' || b.status === 'HARVEST_VERIFIED' || b.status === 'PROCESSED'
   );
 
   const handleVerify = async (batchId) => {
@@ -34,7 +35,7 @@ export default function PendingVerification() {
       <div className="flow-title-row">
         <div className="eyebrow-badge"><ShieldCheck size={13} /> Quality Assurance</div>
         <h2>Pending Tests Queue</h2>
-        <p className="section-lede">Batches awaiting lab verification. Approve harvest registration or submit quality test results.</p>
+        <p className="section-lede">Approve harvest registrations, track batches heading to the processor, and test processed honey received from the processor.</p>
       </div>
 
       <div className="flex gap-12" style={{ marginBottom: '20px' }}>
@@ -43,8 +44,8 @@ export default function PendingVerification() {
           <strong style={{ color: 'var(--amber-400)' }}>{pending.length}</strong>
         </div>
         <div style={{ padding: '10px 18px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '10px', fontSize: '13px' }}>
-          <span style={{ color: 'var(--text-dim)' }}>Awaiting Lab: </span>
-          <strong style={{ color: '#60a5fa' }}>{pending.filter(b => b.status === 'HARVEST_VERIFIED').length}</strong>
+          <span style={{ color: 'var(--text-dim)' }}>To test: </span>
+          <strong style={{ color: '#a78bfa' }}>{pending.filter(b => b.status === 'PROCESSED').length}</strong>
         </div>
         <button onClick={() => switchView('quality-history')} style={{ marginLeft: 'auto', padding: '10px 18px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '10px', fontSize: '12px', color: 'var(--amber-400)', cursor: 'pointer', fontWeight: 600 }}>
           View Test History →
@@ -111,11 +112,16 @@ export default function PendingVerification() {
                       </button>
                     )}
                     {batch.status === 'HARVEST_VERIFIED' && (
+                      <span style={{ padding: '10px 16px', fontSize: '12.5px', color: 'var(--text-dim)', background: 'var(--bg-inset)', borderRadius: '8px' }}>
+                        Harvest approved — the beekeeper sends it to the processor next.
+                      </span>
+                    )}
+                    {batch.status === 'PROCESSED' && (
                       <button
-                        onClick={() => { setTesting(batch.id); switchView('quality-test'); }}
+                        onClick={() => { window.__testingBatchId = batch.id; switchView('quality-test'); }}
                         className="btn btn-gold"
                       >
-                        Submit Lab Test Results →
+                        Run Lab Test on Processed Batch →
                       </button>
                     )}
                     <button

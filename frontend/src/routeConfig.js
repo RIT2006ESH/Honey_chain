@@ -25,10 +25,6 @@ export const VIEW_PATHS = {
   'bk-alerts': '/beekeeper/alerts',
   earnings: '/beekeeper/earnings',
   'bk-profile': '/beekeeper/profile',
-  users: '/admin/users',
-  activity: '/admin/activity',
-  settings: '/admin/settings',
-  reports: '/admin/reports',
   login: '/login',
 };
 

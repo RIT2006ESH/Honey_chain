@@ -43,10 +43,10 @@ const PUBLIC_CASES = [
 ];
 
 const ROLE_CASES = {
-  ADMIN: [['Dashboard', '/'], ['Users', '/admin/users'], ['All Hives', '/monitor'], ['All Batches', '/chain'], ['AI & Alerts', '/ai'], ['Scan Analytics', '/scan'], ['Scale-Up', '/scale-up'], ['Settings', '/admin/settings'], ['Reports', '/admin/reports']],
   BEEKEEPER: [['My Hives', '/monitor'], ['AI Insights', '/ai'], ['Harvest', '/beekeeper/harvest'], ['My Batches', '/beekeeper/batches'], ['Alerts', '/beekeeper/alerts'], ['Earnings', '/beekeeper/earnings'], ['Profile', '/beekeeper/profile']],
-  QUALITY_OFFICER: [['Overview', '/'], ['Pending Queue', '/quality'], ['Lab Test', '/quality/test'], ['History', '/quality/history'], ['Rejected', '/quality/rejected'], ['Standards', '/quality/standards'], ['Reports', '/quality/reports'], ['Hives', '/hives'], ['Blockchain', '/chain']],
-  PROCESSOR: [['Overview', '/'], ['Incoming', '/processing/incoming'], ['Processing', '/processing/log'], ['Packaging', '/processing/packaging'], ['Inventory', '/processing/inventory'], ['Dispatch', '/processing/dispatch'], ['Facility', '/processing/facility'], ['Blockchain', '/chain']],
+  PROCESSOR: [['Overview', '/'], ['Incoming', '/processing/incoming'], ['Processing', '/processing/log']],
+  TESTER: [['Overview', '/'], ['Pending Queue', '/quality'], ['Lab Test', '/quality/test'], ['History', '/quality/history'], ['Rejected', '/quality/rejected'], ['Standards', '/quality/standards'], ['Reports', '/quality/reports'], ['Hives', '/hives'], ['Blockchain', '/chain']],
+  MANUFACTURER: [['Overview', '/'], ['Packaging', '/processing/packaging'], ['Inventory', '/processing/inventory'], ['Dispatch', '/processing/dispatch'], ['Blockchain', '/chain'], ['Consumer Scan', '/scan']],
 };
 
 afterEach(() => {
@@ -77,14 +77,14 @@ test('browser back/forward navigation works', async () => {
 
 test('login button goes to /login', async () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Login' })[0]);
   await waitFor(() => expect(window.location.pathname).toBe('/login'));
 });
 
 for (const [role, cases] of Object.entries(ROLE_CASES)) {
   test(`${role} navbar buttons update the URL`, async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Login' })[0]);
     await waitFor(() => expect(window.location.pathname).toBe('/login'));
     await loginAs(role, role.toLowerCase() + '@honeychain.demo', cases[0][0]);
     for (const [label, path] of cases) {

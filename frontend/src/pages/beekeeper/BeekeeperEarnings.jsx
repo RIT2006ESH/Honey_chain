@@ -15,7 +15,7 @@ export default function BeekeeperEarnings() {
 
   useEffect(() => {
     const myBatches = sharedBatches.filter(b =>
-      b.status === 'PACKAGED' || b.status === 'PROCESSED' || b.status === 'QUALITY_VERIFIED'
+      b.status === 'PACKAGED' || b.status === 'PROCESSED' || b.status === 'QUALITY_VERIFIED' || b.status === 'QA_APPROVED'
     );
 
     const items = myBatches.map(batch => {

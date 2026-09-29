@@ -18,8 +18,10 @@ export default function Packaging() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState('');
+  const [result, setResult] = useState(null);
 
-  const processed = sharedBatches.filter(b => b.status === 'PROCESSED');
+  // Only batches approved by the tester can move to manufacturing/packaging
+  const approved = sharedBatches.filter(b => b.status === 'QA_APPROVED');
 
   const [form, setForm] = useState({
     jarCount: '',
@@ -28,11 +30,23 @@ export default function Packaging() {
     bestBefore: '',
     packagingType: '',
     batchNumber: '',
+    location: 'Nashik Packing Works',
     notes: '',
   });
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const batch = sharedBatches.find(b => b.id === selectedBatch);
+
+  // Live final quantity: jar count x jar weight
+  const weightKg = (() => {
+    const s = (form.jarWeight || '').toLowerCase().trim();
+    const n = parseFloat(s);
+    if (Number.isNaN(n)) return null;
+    return s.includes('kg') ? n : n / 1000;
+  })();
+  const finalQuantityKg = form.jarCount && weightKg
+    ? (parseFloat(form.jarCount) * weightKg).toFixed(2).replace(/\.00$/, '')
+    : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +54,7 @@ export default function Packaging() {
     setSubmitting(true);
 
     try {
-      await fetch(`${API_BASE}/api/batches/${selectedBatch}/packaging`, {
+      const res = await fetch(`${API_BASE}/api/batches/${selectedBatch}/packaging`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -49,14 +63,21 @@ export default function Packaging() {
           sealDate: form.sealDate || new Date().toISOString(),
           bestBefore: form.bestBefore || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           packagingType: form.packagingType,
-          packagedBatchId: form.batchNumber || `PKG-${selectedBatch}`,
+          packagedBatchId: form.batchNumber || (batch?.productionBatchId ? `PKG-${batch.productionBatchId}` : `PKG-${selectedBatch}`),
+          location: form.location,
           notes: form.notes,
         }),
       });
+      const data = await res.json();
+      if (!data.ok) {
+        showNotification(data.error || `Could not package ${selectedBatch}`);
+        return;
+      }
+      setResult(data.batch.packaging);
       setSubmitted(true);
       showNotification(`Packaging complete for ${selectedBatch}`);
     } catch (e) {
-      setSubmitted(true);
+      showNotification('Could not package batch. Is backend running?');
     } finally {
       setSubmitting(false);
     }
@@ -66,10 +87,10 @@ export default function Packaging() {
 
   return (
     <section className="view-pane active">
-      <div className="flow-title-row">
+        <div className="flow-title-row">
         <div className="eyebrow-badge"><Package size={13} /> Packaging</div>
         <h2>Package Batch</h2>
-        <p className="section-lede">Assign final batch ID, jar count, seal date, and generate QR code.</p>
+        <p className="section-lede">Package tester-approved honey: final product batch, quantity, package size, date and location — then generate its QR code.</p>
       </div>
 
       {submitted ? (
@@ -79,13 +100,24 @@ export default function Packaging() {
           </div>
           <h3 className="result-title" style={{ color: 'var(--emerald-400)' }}>Packaging Complete</h3>
           <p className="result-sub">
-            {selectedBatch} — {form.jarCount} jars sealed. QR code generated.
+            {selectedBatch} — {result?.jarCount || form.jarCount} jars sealed. QR code ready.
           </p>
+          {result && (
+            <div className="notice" style={{ maxWidth: '560px', margin: '12px auto 0', textAlign: 'left' }}>
+              <div className="grid-2" style={{ gap: '8px 16px' }}>
+                <div><span style={{ color: 'var(--text-dim)' }}>Product batch: </span><strong style={{ color: 'var(--amber-400)' }}>{result.packagedBatchId}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Final quantity: </span><strong>{result.finalQuantityKg != null ? `${result.finalQuantityKg} kg` : `${result.jarCount} × ${result.jarWeight}`}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Package size: </span><strong>{result.jarCount} × {result.jarWeight}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Packaged on: </span><strong>{result.sealDate ? new Date(result.sealDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-dim)' }}>Location: </span><strong>{result.location}</strong></div>
+              </div>
+            </div>
+          )}
           <div className="result-actions">
             <button onClick={() => switchView('inventory')} className="btn btn-gold">
-              View Inventory <ArrowRight size={14} />
+              View Inventory &amp; QR <ArrowRight size={14} />
             </button>
-            <button onClick={() => { setSubmitted(false); setForm({ jarCount: '', jarWeight: '', sealDate: '', bestBefore: '', packagingType: '', batchNumber: '', notes: '' }); }} className="btn btn-soft">
+            <button onClick={() => { setSubmitted(false); setResult(null); setForm({ jarCount: '', jarWeight: '', sealDate: '', bestBefore: '', packagingType: '', batchNumber: '', location: 'Nashik Packing Works', notes: '' }); }} className="btn btn-soft">
               Package Another
             </button>
           </div>
@@ -94,23 +126,32 @@ export default function Packaging() {
         <div style={{ maxWidth: '760px' }}>
           <form onSubmit={handleSubmit} className="panel">
             <div className="field" style={{ marginBottom: '20px' }}>
-              <label className="field-label">Select Processed Batch *</label>
+              <label className="field-label">Select Approved Batch *</label>
               <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)} required className="select">
-                <option value="">Choose a processed batch...</option>
-                {processed.map(b => (
+                <option value="">Choose a QA-approved batch...</option>
+                {approved.map(b => (
                   <option key={b.id} value={b.id}>{b.id} — {b.honeyType} — {b.quantity}kg</option>
                 ))}
               </select>
-              {processed.length === 0 && <div className="field-hint">No processed batches. Complete processing first.</div>}
+              {approved.length === 0 && <div className="field-hint">No approved batches. The tester approves processed batches for manufacturing first.</div>}
             </div>
 
             {batch && (
-              <div className="grid-4 notice">
-                <div><span style={{ color: 'var(--text-dim)' }}>Batch: </span><strong>{batch.id}</strong></div>
-                <div><span style={{ color: 'var(--text-dim)' }}>Type: </span><strong>{batch.honeyType}</strong></div>
-                <div><span style={{ color: 'var(--text-dim)' }}>Qty: </span><strong>{batch.quantity} kg</strong></div>
-                <div><span style={{ color: 'var(--text-dim)' }}>Hive: </span><strong>{batch.hiveId}</strong></div>
-              </div>
+              <>
+                <div className="grid-4 notice">
+                  <div><span style={{ color: 'var(--text-dim)' }}>Batch: </span><strong>{batch.id}</strong></div>
+                  <div><span style={{ color: 'var(--text-dim)' }}>Type: </span><strong>{batch.honeyType}</strong></div>
+                  <div><span style={{ color: 'var(--text-dim)' }}>Qty: </span><strong>{batch.quantity} kg</strong></div>
+                  <div><span style={{ color: 'var(--text-dim)' }}>Hive: </span><strong>{batch.hiveId}</strong></div>
+                </div>
+                {batch.qualityTest && (
+                  <div className="field-hint" style={{ marginTop: '-12px', marginBottom: '16px' }}>
+                    Approved by {batch.qualityTest.tester || 'Tester'}
+                    {batch.qualityTest.testedAt ? ` on ${new Date(batch.qualityTest.testedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
+                    {batch.qualityTest.labName ? ` · ${batch.qualityTest.labName}` : ''}
+                  </div>
+                )}
+              </>
             )}
 
             <div className="section-title">Packaging Details</div>
@@ -123,24 +164,39 @@ export default function Packaging() {
                 </select>
               </div>
               <div className="field">
-                <label className="field-label">Packaged Batch ID</label>
-                <input type="text" value={form.batchNumber} onChange={e => update('batchNumber', e.target.value)} placeholder={selectedBatch ? `PKG-${selectedBatch}` : 'PKG-HC-XXXX'} className="input" />
+                <label className="field-label">Final Product Batch ID</label>
+                <input
+                  type="text"
+                  value={form.batchNumber}
+                  onChange={e => update('batchNumber', e.target.value)}
+                  placeholder={batch?.productionBatchId ? `PKG-${batch.productionBatchId}` : (selectedBatch ? `PKG-${selectedBatch}` : 'PKG-HC-XXXX')}
+                  className="input"
+                />
+                <div className="field-hint">Unique per product batch; encoded in the QR code.</div>
               </div>
               <div className="field">
                 <label className="field-label">Jar Count *</label>
                 <input type="number" min="1" value={form.jarCount} onChange={e => update('jarCount', e.target.value)} placeholder="e.g. 24" required className="input" />
               </div>
               <div className="field">
-                <label className="field-label">Jar Weight</label>
+                <label className="field-label">Package Size (per jar)</label>
                 <input type="text" value={form.jarWeight} onChange={e => update('jarWeight', e.target.value)} placeholder="500g" className="input" />
+                {finalQuantityKg && (
+                  <div className="field-hint">Final quantity: <strong>{finalQuantityKg} kg</strong> ({form.jarCount} × {form.jarWeight})</div>
+                )}
               </div>
               <div className="field">
-                <label className="field-label">Seal Date *</label>
+                <label className="field-label">Packaging / Seal Date *</label>
                 <input type="date" value={form.sealDate || today} onChange={e => update('sealDate', e.target.value)} required className="input" />
               </div>
               <div className="field">
                 <label className="field-label">Best Before</label>
                 <input type="date" value={form.bestBefore} onChange={e => update('bestBefore', e.target.value)} className="input" />
+              </div>
+              <div className="field">
+                <label className="field-label">Manufacturing Location *</label>
+                <input type="text" value={form.location} onChange={e => update('location', e.target.value)} required className="input" placeholder="e.g. Nashik Packing Works" />
+                <div className="field-hint">Recorded with the packaging date on the batch record.</div>
               </div>
             </div>
 

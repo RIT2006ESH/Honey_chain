@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Cpu, ShieldCheck, Search, Layers, Award, TrendingUp, Sparkles,
-  Users, Sun, Moon, BarChart3, Settings, FileText,
+  Sun, Moon, BarChart3, Settings,
   Droplets, Bell, IndianRupee, User, FlaskConical, History, AlertTriangle, BookOpen,
   Inbox, Package, Archive, Truck, Building2, QrCode, Menu, X, LogIn, LogOut
 } from 'lucide-react';
@@ -15,9 +15,6 @@ const VIEW_ICONS = {
   chain: Layers,
   qr: Search,
   scale: TrendingUp,
-  users: Users,
-  settings: Settings,
-  reports: FileText,
   harvest: Droplets,
   'my-batches': Layers,
   'bk-alerts': Bell,
@@ -47,17 +44,6 @@ const NAV_ITEMS = {
     ['qr', 'Consumer Scan'],
     ['scale', 'Scale-Up Plan'],
   ],
-  ADMIN: [
-    ['overview', 'Dashboard'],
-    ['users', 'Users'],
-    ['monitor', 'All Hives'],
-    ['chain', 'All Batches'],
-    ['ai', 'AI & Alerts'],
-    ['qr', 'Scan Analytics'],
-    ['scale', 'Scale-Up'],
-    ['settings', 'Settings'],
-    ['reports', 'Reports'],
-  ],
   BEEKEEPER: [
     ['monitor', 'My Hives'],
     ['ai', 'AI Insights'],
@@ -67,7 +53,12 @@ const NAV_ITEMS = {
     ['earnings', 'Earnings'],
     ['bk-profile', 'Profile'],
   ],
-  QUALITY_OFFICER: [
+  PROCESSOR: [
+    ['overview', 'Overview'],
+    ['proc-incoming', 'Incoming'],
+    ['processing-log', 'Processing'],
+  ],
+  TESTER: [
     ['overview', 'Overview'],
     ['quality', 'Pending Queue'],
     ['quality-test', 'Lab Test'],
@@ -78,15 +69,13 @@ const NAV_ITEMS = {
     ['hives', 'Hives'],
     ['chain', 'Blockchain'],
   ],
-  PROCESSOR: [
+  MANUFACTURER: [
     ['overview', 'Overview'],
-    ['proc-incoming', 'Incoming'],
-    ['processing-log', 'Processing'],
     ['packaging', 'Packaging'],
     ['inventory', 'Inventory'],
     ['dispatch', 'Dispatch'],
-    ['facility', 'Facility'],
     ['chain', 'Blockchain'],
+    ['qr', 'Consumer Scan'],
   ],
 };
 

@@ -39,7 +39,7 @@ export default function QualityStandards() {
       <div className="flow-title-row">
         <div className="eyebrow-badge"><BookOpen size={13} /> Reference Standards</div>
         <h2>Quality Standards &amp; Thresholds</h2>
-        <p className="section-lede">Testing criteria for honey quality certification. Admin-editable, officer read-only by default.</p>
+        <p className="section-lede">Testing criteria for honey quality certification. Lab-editable, tester read-only by default.</p>
       </div>
 
       {loading ? (

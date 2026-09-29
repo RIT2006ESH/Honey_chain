@@ -85,7 +85,7 @@ export default function ConsumerScan() {
         extractionMethod: apiBatch.extractionMethod || 'N/A',
         quantityKg: apiBatch.quantity || 0,
         gps: null,
-        verified: ['QUALITY_VERIFIED', 'PROCESSED', 'PACKAGED', 'DISPATCHED', 'CERTIFIED'].includes(apiBatch.status),
+        verified: ['QUALITY_VERIFIED', 'QA_APPROVED', 'PROCESSED', 'PACKAGED', 'DISPATCHED', 'CERTIFIED'].includes(apiBatch.status),
         lab: apiBatch.quality || apiBatch.qualityTest ? normalizeLab(apiBatch.quality || apiBatch.qualityTest) : null,
         hash: '0x' + Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
         checkpoints: (apiBatch.transactions || []).map(tx => ({

@@ -56,10 +56,10 @@ Password is not actually checked (see [Known Issues](#13-known-issues--improveme
 
 | Email | Role | Name |
 |---|---|---|
-| `admin@honeychain.demo` | `ADMIN` | Admin User |
 | `beekeeper@honeychain.demo` | `BEEKEEPER` | Rameshwar Verma |
-| `officer@honeychain.demo` | `QUALITY_OFFICER` | Dr. Sharma |
 | `processor@honeychain.demo` | `PROCESSOR` | Satara Processing Unit |
+| `tester@honeychain.demo` | `TESTER` | Dr. Sharma |
+| `manufacturer@honeychain.demo` | `MANUFACTURER` | Nashik Packing Works |
 
 Any other email → `401 Invalid mock credentials`.
 
@@ -134,7 +134,7 @@ frontend/
     │   ├── ConsumerScan.jsx      # Consumer QR verification passport
     │   ├── ScaleUp.jsx           # Phased rollout plan
     │   │
-    │   ├── quality/              # 7 — QUALITY_OFFICER workspace
+    │   ├── quality/              # 7 — TESTER workspace
     │   │   ├── PendingVerification.jsx
     │   │   ├── QualityTestForm.jsx
     │   │   ├── QualityHistory.jsx
@@ -159,12 +159,6 @@ frontend/
     │   │   ├── BeekeeperAlerts.jsx
     │   │   ├── BeekeeperEarnings.jsx
     │   │   └── BeekeeperProfile.jsx
-    │   │
-    │   └── admin/                # 4 — ADMIN workspace
-    │       ├── UsersManagement.jsx
-    │       ├── ActivityLog.jsx
-    │       ├── AdminSettings.jsx
-    │       └── AdminReports.jsx
     │
     ├── data/
     │   └── mockData.js           # Offline fallback datasets
@@ -239,16 +233,16 @@ frontend/
 | `Overview.jsx` | 212 | KPI dashboard: stat strip, recent alerts, latest batch card, production chart with range toggle (7/30/90 d). | `GET /api/batches`, `GET /api/iot/hives` (result discarded — see issues) |
 | `HiveMonitor.jsx` | 313 | Left sidebar hive selector + add-hive modal; right pane with 4 core sensor gauges, AI health, trends, alerts. Beekeeper-only harvest form. | via context: `POST /api/iot/hives`, `POST /api/batches` |
 | `AIInsights.jsx` | 502 | Colony health score, queen/swarm status, 3-way disease risk (Varroa/Foulbrood/Nosema) with progress bars, yield forecast, anomaly detection, recommended actions, model confidence. | none (mock) |
-| `BlockchainTrace.jsx` | 540 | Batch search, "Chain Integrity Status", expandable per-block checkpoint chain showing hash / quality / documents. | none (mock) |
+| `BlockchainTrace.jsx` | 545 | Batch search, "Chain Integrity Status", expandable per-block checkpoint chain showing hash / quality / documents. Checkpoints map `Sent to processor`/`Received by processor` events to stages and show the batch's real processing location. | none (batch `transactions`) |
 | `ConsumerScan.jsx` | 417 | Consumer QR passport: QR render, batch lookup, 7 result sections (authenticity badge, source story, plain-language lab results, origin map, timeline, ledger reference, report-counterfeit form). | `POST /api/reports` |
 | `ScaleUp.jsx` | 446 | Static deployment roadmap: summary metrics, 3-phase rollout, cluster network map, tech stack, cost & partner model, KVIC integration flow. | none |
 
-### 4.4 Pages — Quality Officer
+### 4.4 Pages — Tester
 
 | File | Lines | Screen | API calls |
 |---|---:|---|---|
-| `quality/PendingVerification.jsx` | 143 | Queue table of unverified harvests with a Verify action. | `POST /api/batches/:id/verify` |
-| `quality/QualityTestForm.jsx` | 195 | Lab test submission: moisture, NMR purity, HMF, result. Writes straight to `quality-test` (the smart-contract gate). | `POST /api/quality-test` |
+| `quality/PendingVerification.jsx` | ~145 | Queue: harvest approvals (HARVEST_CREATED), batches awaiting beekeeper handoff (HARVEST_VERIFIED), and processed batches received from the processor with a "Run Lab Test" action. | `POST /api/batches/:id/verify` |
+| `quality/QualityTestForm.jsx` | ~250 | Lab test on **processed** honey: moisture, NMR purity, HMF, free acidity, sugar profile, C4 adulteration, certificate upload; records tester + date, shows Passed/Failed and "Approved for Manufacturing". | `POST /api/quality-test` |
 | `quality/QualityHistory.jsx` | 129 | Table of all past lab results, filterable, with row detail. | `GET /api/quality/history` |
 | `quality/RejectedBatches.jsx` | 108 | Rejected batches with computed rejection reasons and severity. | `GET /api/quality/rejected` |
 | `quality/QualityStandards.jsx` | 99 | Editable threshold table (FSSAI / AGMARK / NICES / EU / Internal). | `GET /api/quality/standards`, `POST /api/quality/standards` |
@@ -260,10 +254,10 @@ frontend/
 | File | Lines | Screen | API calls |
 |---|---:|---|---|
 | `processor/Processing.jsx` | 58 | Processor landing: per-batch process form + Package action. | via context: `POST /api/batches/:id/process`, `POST /api/batches/:id/package` |
-| `processor/IncomingBatches.jsx` | 101 | Incoming queue table with Accept/Process. | `POST /api/batches/:id/process` |
-| `processor/ProcessingLog.jsx` | 157 | Processing log table + repeat-process form. | `POST /api/batches/:id/process` |
-| `processor/Packaging.jsx` | 160 | Packaging form: jar count, jar weight, seal date, best-before, packaging type. | `POST /api/batches/:id/packaging` |
-| `processor/Inventory.jsx` | 174 | Finished-goods table; per-row QR modal hitting the QR generator. | `GET /api/inventory`, `GET /api/qr/:batchId` |
+| `processor/IncomingBatches.jsx` | ~185 | Incoming queue: in-transit handoff cards with **Receive** action, received consignments ready for processing (Start Processing auto-receives), plus batches handed to the tester. | `POST /api/batches/:id/receive`, `POST /api/batches/:id/process` |
+| `processor/ProcessingLog.jsx` | ~255 | Extraction + filtration/settling form; success screen and "Processing Records" table show production batch id, processed-at date and location. | `POST /api/batches/:id/process`, `POST /api/processing-step` |
+| `processor/Packaging.jsx` | ~205 | Packaging form for **QA-approved batches**: packaging type, final product batch id, jar count + package size (live final-qty hint), packaging/seal date, best-before, manufacturing location; success card shows product batch, final quantity, date and location. | `POST /api/batches/:id/packaging` |
+| `processor/Inventory.jsx` | ~198 | Finished-goods table with package size/final qty, packaging date + location, production batch id; per-row QR modal (image + verification URL + download). | `GET /api/inventory`, `GET /api/qr/:batchId` |
 | `processor/DistributionHandoff.jsx` | 167 | Dispatch form: logistics partner, destination, date, jar count, tracking id. | `POST /api/batches/:id/dispatch` |
 | `processor/FacilityInfo.jsx` | 140 | Facility profile: certifications, equipment table with service dates, blockchain node sync status, operators. | `GET /api/facility` |
 | `processor/ProcessorBatches.jsx` | 50 | All-batches table. | none (context) — **no nav entry** |
@@ -272,20 +266,11 @@ frontend/
 
 | File | Lines | Screen | API calls |
 |---|---:|---|---|
-| `beekeeper/MyBatches.jsx` | 76 | Personal batch list with trace/scan shortcuts. | none (context) |
+| `beekeeper/MyBatches.jsx` | ~110 | Personal batch list with pipeline stages, **Send to Processor** handoff button + "sent" badge, trace shortcut. | via context: `POST /api/batches/:id/handoff` |
 | `beekeeper/HarvestSubmission.jsx` | 191 | Harvest form: honey type, extraction method, quantity, harvest date. | `POST /api/batches` |
 | `beekeeper/BeekeeperAlerts.jsx` | 112 | Alerts derived from hive + batch state. | none (context) |
 | `beekeeper/BeekeeperEarnings.jsx` | 114 | Earnings summary cards. | none (context) |
 | `beekeeper/BeekeeperProfile.jsx` | 115 | Profile card + participation stats. | none (context) |
-
-### 4.7 Pages — Admin
-
-| File | Lines | Screen | API calls |
-|---|---:|---|---|
-| `admin/UsersManagement.jsx` | 175 | User CRUD: list, invite, delete. Guards are UI-only. | `GET /api/users`, `POST /api/users`, `DELETE /api/users/:id` |
-| `admin/ActivityLog.jsx` | 85 | Audit/activity table (mock-driven). | none — **no nav entry** |
-| `admin/AdminSettings.jsx` | 121 | Static settings panel. | none |
-| `admin/AdminReports.jsx` | 146 | Report cards over `sharedBatches`. | none (context) |
 
 ---
 
@@ -304,30 +289,26 @@ components come from the `VIEWS` map in `App.jsx:48-79`. A `path="*"` catch-all 
 | `qr` | `/scan` | `ConsumerScan` | public |
 | `scale` | `/scale-up` | `ScaleUp` | public |
 | `login` | `/login` | `LoginPage` | public |
-| `quality` | `/quality` | `PendingVerification` | QUALITY_OFFICER |
-| `quality-test` | `/quality/test` | `QualityTestForm` | QUALITY_OFFICER |
-| `quality-history` | `/quality/history` | `QualityHistory` | QUALITY_OFFICER |
-| `quality-rejected` | `/quality/rejected` | `RejectedBatches` | QUALITY_OFFICER |
-| `quality-standards` | `/quality/standards` | `QualityStandards` | QUALITY_OFFICER |
-| `quality-reports` | `/quality/reports` | `QualityReports` | QUALITY_OFFICER |
-| `hives` | `/hives` | `HivesView` | QUALITY_OFFICER |
+| `quality` | `/quality` | `PendingVerification` | TESTER |
+| `quality-test` | `/quality/test` | `QualityTestForm` | TESTER |
+| `quality-history` | `/quality/history` | `QualityHistory` | TESTER |
+| `quality-rejected` | `/quality/rejected` | `RejectedBatches` | TESTER |
+| `quality-standards` | `/quality/standards` | `QualityStandards` | TESTER |
+| `quality-reports` | `/quality/reports` | `QualityReports` | TESTER |
+| `hives` | `/hives` | `HivesView` | TESTER |
 | `processing` | `/processing` | `Processing` | PROCESSOR — **no nav entry** |
 | `proc-incoming` | `/processing/incoming` | `IncomingBatches` | PROCESSOR |
 | `processing-log` | `/processing/log` | `ProcessingLog` | PROCESSOR |
-| `packaging` | `/processing/packaging` | `Packaging` | PROCESSOR |
-| `inventory` | `/processing/inventory` | `Inventory` | PROCESSOR |
-| `dispatch` | `/processing/dispatch` | `DistributionHandoff` | PROCESSOR |
-| `facility` | `/processing/facility` | `FacilityInfo` | PROCESSOR |
+| `packaging` | `/processing/packaging` | `Packaging` | MANUFACTURER |
+| `inventory` | `/processing/inventory` | `Inventory` | MANUFACTURER |
+| `dispatch` | `/processing/dispatch` | `DistributionHandoff` | MANUFACTURER |
+| `facility` | `/processing/facility` | `FacilityInfo` | PROCESSOR — **no nav entry** |
 | `proc-batches` | `/processing/batches` | `ProcessorBatches` | PROCESSOR — **no nav entry** |
 | `my-batches` | `/beekeeper/batches` | `MyBatches` | BEEKEEPER |
 | `harvest` | `/beekeeper/harvest` | `HarvestSubmission` | BEEKEEPER |
 | `bk-alerts` | `/beekeeper/alerts` | `BeekeeperAlerts` | BEEKEEPER |
 | `earnings` | `/beekeeper/earnings` | `BeekeeperEarnings` | BEEKEEPER |
 | `bk-profile` | `/beekeeper/profile` | `BeekeeperProfile` | BEEKEEPER |
-| `users` | `/admin/users` | `UsersManagement` | ADMIN |
-| `activity` | `/admin/activity` | `ActivityLog` | ADMIN — **no nav entry** |
-| `settings` | `/admin/settings` | `AdminSettings` | ADMIN |
-| `reports` | `/admin/reports` | `AdminReports` | ADMIN |
 
 ### Special routing behaviours
 
@@ -342,8 +323,8 @@ and why `backend/src/routes/qr.js` encodes the URL as `#verify/<batchId>`.
 **Scroll reset.** Every `location.pathname` change triggers `window.scrollTo({ top: 0, behavior: 'smooth' })`.
 
 **No route guards.** `Header.jsx` hides nav items by role, but `AppShell` maps every path
-to a component with zero auth checks. Any user can deep-link to `/admin/users` or `/quality`.
-See [Known Issues](#13-known-issues--improvement-backlog).
+to a component with zero auth checks. Any user can deep-link to `/quality` or
+`/processing/inventory`. See [Known Issues](#13-known-issues--improvement-backlog).
 
 ---
 
@@ -380,6 +361,7 @@ const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 | `handleProcessSubmit(e, id)` | `POST /api/batches/:id/process` | Reads `center`, `qtyProcessed` |
 | `handlePackageSubmit(id)` | `POST /api/batches/:id/package` | Fire-and-forget |
 | `handleAddHive(data)` | `POST /api/iot/hives` | Maps the API hive → the UI's flat `hives` shape, then re-keys state |
+| `sendToProcessor(id)` | `POST /api/batches/:id/handoff` | Beekeeper handoff; sends `{ sender: currentUser.name }`, notifies + refetches on success |
 
 ### 6.3 Effects
 
@@ -426,9 +408,12 @@ rather than a blank screen.
 | `/api/auth/login` | POST | `AppContext.handleLogin` |
 | `/api/batches` | GET | `AppContext.fetchBatches` (10 s poll), `Overview.jsx:19` |
 | `/api/batches` | POST | `AppContext.handleRegisterHarvest`, `beekeeper/HarvestSubmission.jsx:51` |
+| `/api/batches/:id/handoff` | POST | `AppContext.sendToProcessor` ← `beekeeper/MyBatches.jsx` |
+| `/api/batches/:id/receive` | POST | `processor/IncomingBatches.jsx` (Receive button, and auto-receive inside Start Processing) |
 | `/api/batches/:id/verify` | POST | `quality/PendingVerification.jsx:27` · context `handleVerifyBatch` *(dead)* |
 | `/api/batches/:id/quality` | POST | context `handleQualitySubmit` *(dead — no caller)* |
-| `/api/batches/:id/process` | POST | `AppContext.handleProcessSubmit`, `processor/IncomingBatches.jsx:17`, `processor/ProcessingLog.jsx:42` |
+| `/api/batches/:id/process` | POST | `AppContext.handleProcessSubmit`, `processor/IncomingBatches.jsx`, `processor/ProcessingLog.jsx` |
+| `/api/processing-step` | POST | `processor/ProcessingLog.jsx` (records the Filtration & Settling step) |
 | `/api/batches/:id/package` | POST | `AppContext.handlePackageSubmit` |
 | `/api/batches/:id/packaging` | POST | `processor/Packaging.jsx:43` |
 | `/api/batches/:id/dispatch` | POST | `processor/DistributionHandoff.jsx:54` |
@@ -445,28 +430,28 @@ rather than a blank screen.
 | `/api/inventory` | GET | `processor/Inventory.jsx:23` |
 | `/api/qr/:batchId` | GET | `processor/Inventory.jsx:46` |
 | `/api/facility` | GET | `processor/FacilityInfo.jsx:12` |
-| `/api/users` | GET | `admin/UsersManagement.jsx:22` |
-| `/api/users` | POST | `admin/UsersManagement.jsx:43` |
-| `/api/users/:id` | DELETE | `admin/UsersManagement.jsx:59` |
 | `/api/reports` | POST | `ConsumerScan.jsx:113` |
 
 ### 7.2 Two parallel quality paths
 
 There are **two ways** to record a lab result, and they hit different endpoints:
 
-- `POST /api/quality-test` — the full smart-contract gate (moisture / NMR / HMF / C4-sugar,
-  computes FSSAI pass-fail, sets status `CERTIFIED` or `REJECTED`). Used by `QualityTestForm`.
+- `POST /api/quality-test` — the full smart-contract gate (moisture / NMR / HMF / C4-sugar /
+  free acidity, computes FSSAI pass-fail). For a **processed** batch it sets `QA_APPROVED`
+  (tester's approval for manufacturing) or `REJECTED`; for raw honey it sets `CERTIFIED` /
+  `REJECTED`. Used by `QualityTestForm`.
 - `POST /api/batches/:id/quality` — a thin legacy shim that just stores the body and sets
   `QUALITY_VERIFIED`. Handler exists in context but is never called.
 
-`QualityTestForm` (the live one) is the one that actually gates certification.
+`QualityTestForm` (the live one) is the one that actually gates certification — and both
+packaging routes refuse batches that are not `QA_APPROVED`.
 
 ### 7.3 Unused backend endpoints
 
 Present on the API, never called by the frontend:
 `GET /api/health` · `GET /api/beekeepers` · `POST /api/beekeepers` · `POST /api/harvest-event` ·
 `POST /api/ai/diagnose` · `POST /api/ai/predict-yield` · `GET /api/provenance/:batchId` ·
-`GET /api/reports` · `POST /api/processing-step`.
+`GET /api/reports`.
 
 `GET /api/provenance/:batchId` is the most notable gap — the backend already assembles a
 complete FHIR-style `HoneyTraceabilityBundle` (merkle root, masked Aadhaar, KRISHI id,
@@ -488,28 +473,31 @@ passport, and the KVIC scale-up roadmap. All work with the backend offline.
 ### BEEKEEPER
 `/beekeeper/batches` · `/beekeeper/harvest` · `/beekeeper/alerts` · `/beekeeper/earnings` · `/beekeeper/profile`
 
-Submit a harvest (becomes a blockchain `HARVEST_CREATED` event), track batch status through
-the chain, see alerts for own hives, review earnings, view profile.
-`HiveMonitor` also reveals a beekeeper-only "Register Harvest" panel.
+Submit a harvest (becomes a blockchain `HARVEST_CREATED` event), **send the harvested honey on
+to the processor** (`POST /api/batches/:id/handoff` → `HANDOFF_TO_PROCESSOR` block, shown to the
+processor as "In Transit"), track batch status through the chain, see alerts for own hives,
+review earnings, view profile. `HiveMonitor` also reveals a beekeeper-only "Register Harvest"
+panel.
 
-### QUALITY_OFFICER
+### PROCESSOR
+`/processing/incoming` · `/processing/log`
+(plus `/processing`, `/processing/packaging`, `/processing/inventory`, `/processing/dispatch`,
+`/processing/facility` and `/processing/batches` by URL only)
+
+Accept incoming batches and log processing steps. Packaging, inventory, dispatch and facility
+screens are no longer part of this role's navigation.
+
+### TESTER
 `/quality` · `/quality/test` · `/quality/history` · `/quality/rejected` · `/quality/standards` · `/quality/reports` · `/hives`
 
 Verify incoming harvests, submit lab tests that gate certification, browse full history and
 rejections with computed reasons, edit the threshold table, view trend analytics, inspect hives.
 
-### PROCESSOR
-`/processing/incoming` · `/processing/log` · `/processing/packaging` · `/processing/inventory` · `/processing/dispatch` · `/processing/facility`
-(plus `/processing` and `/processing/batches` by URL only)
+### MANUFACTURER
+`/processing/packaging` · `/processing/inventory` · `/processing/dispatch` · `/chain` · `/scan`
 
-Accept incoming batches, log processing, record packaging details, manage finished inventory
-with per-batch QR generation, dispatch with tracking ids, and view facility certifications,
-equipment, and blockchain node sync status.
-
-### ADMIN
-`/admin/users` · `/admin/settings` · `/admin/reports` (plus `/admin/activity` by URL only)
-
-Invite and remove users, view system settings, generate reports.
+Packaging, inventory and dispatch views shared with the processor, plus the blockchain
+explorer and consumer scan screen.
 
 ---
 
@@ -586,7 +574,7 @@ Imported in this exact order from `src/styles/index.css` (imported once, `App.js
 | `footer.css` | 214 | Site footer — **intentionally hardcoded dark in both themes**, honeycomb watermark, 4-col grid |
 | `dashboard.css` | 202 | `.clickable`, metric popovers, system status strip, panel headers, alert list, production chart, batch cards |
 | `roles.css` | 566 | Login card + status badges, then the full **Hive Monitor Dashboard** (`.mm-*`): sidebar, header card, status strip, chart row, 3-col sensor grid, table, timeline |
-| `login.css` | 803 | Full dark login: glow orbs (blur 100px), split pane (480px form), `.lcd-*` form, role badge colours (`.badge-admin` blue, `.badge-bk` orange) |
+| `login.css` | 789 | Full dark login: glow orbs (blur 100px), split pane (480px form), `.lcd-*` form, role badge colours (`.badge-bk` green, `.badge-proc` orange, `.badge-test` blue, `.badge-mfr` purple) |
 | `login-light.css` | 118 | Pure `[data-theme='light']` override layer, using its own palette (`#f7f2e8`, `#2f261f`, `#b87319`) |
 | `design-system.css` | 684 | **The primitive library**: `.btn` (+gold/outline/soft/danger/sm/lg/block), `.field`, `.input`/`.select`/`.textarea` (inline-SVG select arrow), `.panel`, `.kpi-grid`/`.kpi-card`, `.chip`, `.pill`, `.table-scroll`/`.hc-table`, `.state-empty`/`.state-loading`, `.result-hero`, `.notice`, `.summary-strip`, `.modal-window`, `.app-notice` (fixed top pill), staggered `slideUp` page entrance. Only file gating animations behind `prefers-reduced-motion: no-preference`. |
 | `responsive.css` | 388 | Breakpoints at 1180/861/860/768/600/520/400 + `max-height` variants; `@media (pointer: coarse)` for 40–48px tap targets; `@supports` safe-area insets. Contains inline-style attribute hacks: `[style*="repeat(4"]`, `[style*="auto-fill"]`, `[style*="1fr 1fr"]`, … to collapse React `gridTemplateColumns` to one column. |
@@ -642,7 +630,7 @@ Single suite: `src/__tests__/routing.test.jsx` (94 lines). CRA's Jest + React Te
 | Public nav | Each public URL renders its screen |
 | Back / forward | Browser history navigation updates the view |
 | Login | Submitting redirects to `/login` |
-| Role nav (×4) | ADMIN / BEEKEEPER / QUALITY_OFFICER / PROCESSOR each get their own tab set |
+| Role nav (×4) | BEEKEEPER / PROCESSOR / TESTER / MANUFACTURER each get their own tab set |
 
 `fetch` is mocked so that `POST /api/auth/login` returns `{ user: { role } }`, letting the
 per-role assertions run without a backend.
@@ -712,7 +700,7 @@ Safe to delete.
    doesn't catch it because `fireEvent.click` bypasses HTML5 `required` validation.
 
 2. **No route-level authorization.** `Header.jsx` hides tabs by role, but `AppShell` renders
-   every path unconditionally. Any visitor can deep-link to `/admin/users`, `/quality`,
+   every path unconditionally. Any visitor can deep-link to `/quality`,
    `/processing/inventory`, etc. Fix: wrap `AppRoute` in a guard that reads `currentUser.role`
    and redirects to `/login` or a 403 view.
 
@@ -798,8 +786,8 @@ Safe to delete.
     Move it to an env var.
 
 20. **Three orphaned pages** have no nav entry in any role and are reachable only by URL:
-    `Processing` (`/processing`), `ProcessorBatches` (`/processing/batches`),
-    `ActivityLog` (`/admin/activity`). Either add nav items or remove the routes.
+    `Processing` (`/processing`), `ProcessorBatches` (`/processing/batches`) and
+    `FacilityInfo` (`/processing/facility`). Either add nav items or remove the routes.
 
 21. **`YieldForecastPaths` ignores the selected hive** — the forecast curves are static.
     Drive them from `curHive` / the `/api/ai/predict-yield` endpoint.
