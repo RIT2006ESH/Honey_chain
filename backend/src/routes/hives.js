@@ -4,15 +4,17 @@ const { addBlockToChain } = require('../blockchain');
 const { evaluateAlerts, simulateTelemetry } = require('../telemetry');
 const router = Router();
 
-// Hive registrations are NOT live until an administrator reviews them.
+// Hive registrations are NOT live until a signed-in user reviews them.
 function isApproved(hive) {
   return !hive.approvalStatus || hive.approvalStatus === 'APPROVED';
 }
 
-function adminOnly(req, res, next) {
+const KNOWN_ROLES = ['BEEKEEPER', 'PROCESSOR', 'TESTER', 'MANUFACTURER'];
+
+function reviewerOnly(req, res, next) {
   const role = req.get('x-user-role') || (req.body && req.body.role);
-  if (role !== 'ADMIN') {
-    return res.status(403).json({ ok: false, error: 'Only an administrator can review hive registrations' });
+  if (!KNOWN_ROLES.includes(role)) {
+    return res.status(403).json({ ok: false, error: 'Sign in to review hive registrations' });
   }
   next();
 }
@@ -38,7 +40,7 @@ router.get('/:hiveId', (req, res) => {
   res.json({ ok: true, hive });
 });
 
-// 1. Beekeeper registers a smart hive -> waits for admin approval
+// 1. Beekeeper registers a smart hive -> waits for review
 router.post('/', (req, res) => {
   const { location, beekeeperName, floralSource, cluster, coordinates } = req.body;
   const { hiveId, n: hiveCount } = nextHiveId();
@@ -55,7 +57,7 @@ router.post('/', (req, res) => {
     installationDate: requestedAt.split('T')[0],
     queenStatus: 'Awaiting first inspection',
     colonyHealth: 'PENDING',
-    weather: 'Awaiting admin approval',
+    weather: 'Awaiting review',
     powerSource: 'Solar-assisted',
     firmwareVersion: 'v2.3.1',
     calibrationDue: 'Not scheduled',
@@ -83,8 +85,8 @@ router.post('/', (req, res) => {
   res.json({ ok: true, hive: newHive });
 });
 
-// 2. Admin approves -> hive goes live with a realistic telemetry baseline
-router.post('/:hiveId/approve', adminOnly, (req, res) => {
+// 2. Reviewer approves -> hive goes live with a realistic telemetry baseline
+router.post('/:hiveId/approve', reviewerOnly, (req, res) => {
   const hive = hives[req.params.hiveId];
   if (!hive) return res.status(404).json({ ok: false, error: 'Hive not found' });
   if (isApproved(hive)) return res.status(400).json({ ok: false, error: 'Hive is already approved' });
@@ -108,7 +110,7 @@ router.post('/:hiveId/approve', adminOnly, (req, res) => {
     ...(hive.approval || {}),
     requestedAt: (hive.approval && hive.approval.requestedAt) || now,
     reviewedAt: now,
-    reviewedBy: (req.body && req.body.reviewer) || 'Admin',
+    reviewedBy: (req.body && req.body.reviewer) || 'Reviewer',
     note: (req.body && req.body.note) || 'Approved'
   };
   hive.colonyHealth = 'EXCELLENT';
@@ -131,8 +133,8 @@ router.post('/:hiveId/approve', adminOnly, (req, res) => {
   res.json({ ok: true, hive });
 });
 
-// 3. Admin rejects -> hive stays out of the monitoring network
-router.post('/:hiveId/reject', adminOnly, (req, res) => {
+// 3. Reviewer rejects -> hive stays out of the monitoring network
+router.post('/:hiveId/reject', reviewerOnly, (req, res) => {
   const hive = hives[req.params.hiveId];
   if (!hive) return res.status(404).json({ ok: false, error: 'Hive not found' });
   if (hive.approvalStatus === 'REJECTED') return res.status(400).json({ ok: false, error: 'Hive is already rejected' });
@@ -143,8 +145,8 @@ router.post('/:hiveId/reject', adminOnly, (req, res) => {
     ...(hive.approval || {}),
     requestedAt: (hive.approval && hive.approval.requestedAt) || now,
     reviewedAt: now,
-    reviewedBy: (req.body && req.body.reviewer) || 'Admin',
-    note: (req.body && req.body.note) || 'Rejected by administrator'
+    reviewedBy: (req.body && req.body.reviewer) || 'Reviewer',
+    note: (req.body && req.body.note) || 'Rejected by reviewer'
   };
   hive.colonyHealth = 'REJECTED';
   hive.telemetry = null;
@@ -162,7 +164,7 @@ router.post('/:hiveId/telemetry', (req, res) => {
   const hive = hives[req.params.hiveId];
   if (!hive) return res.status(404).json({ ok: false, error: 'Hive not found' });
   if (!hive.telemetry) hive.telemetry = {};
-  if (!isApproved(hive)) return res.status(403).json({ ok: false, error: 'Hive is awaiting admin approval' });
+  if (!isApproved(hive)) return res.status(403).json({ ok: false, error: 'Hive is awaiting review' });
 
   const { internalTemp, humidity, weightKg, acousticFreqHz, co2Ppm } = req.body;
 

@@ -28,7 +28,7 @@ router.get('/ledger', (req, res) => {
 router.get('/kvic/dashboard', (req, res) => {
   const allBatches = Object.values(batches);
   const totalHarvestKg = allBatches.reduce((sum, b) => sum + (b.quantityKg || 0), 0);
-  const certifiedCount = allBatches.filter(b => b.status === 'CERTIFIED' || b.status === 'PACKAGED').length;
+  const certifiedCount = allBatches.filter(b => b.status === 'CERTIFIED' || b.status === 'QA_APPROVED' || b.status === 'PACKAGED').length;
 
   res.json({
     ok: true,
@@ -57,6 +57,8 @@ router.get('/inventory', (req, res) => {
       quantity: b.quantity,
       status: b.status,
       processing: b.processing || null,
+      production: b.production || null,
+      productionBatchId: b.productionBatchId || null,
       packaging: b.packaging || null,
       dispatch: b.dispatch || null,
       beekeeper: b.beekeeper || 'Unknown',

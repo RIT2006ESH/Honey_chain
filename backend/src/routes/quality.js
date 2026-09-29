@@ -10,12 +10,16 @@ testRouter.post('/', (req, res) => {
   const {
     batchId,
     labName,
+    tester,
     moisturePercent,
     nmrPurityScore,
     c4SugarAdulteration,
     hmf,
+    acidity,
+    sugarProfile,
     pollenDominance,
     antibioticResidues,
+    certificateName,
   } = req.body;
 
   const batch = batches[batchId];
@@ -24,24 +28,39 @@ testRouter.post('/', (req, res) => {
   const moisture = parseFloat(moisturePercent) || 18.0;
   const nmrScore = parseFloat(nmrPurityScore) || 99.2;
   const hmfVal = parseFloat(hmf) || 14.0;
+  const acidityVal = acidity != null && acidity !== '' ? parseFloat(acidity) : null;
   const isC4Negative = (c4SugarAdulteration || 'NEGATIVE').toUpperCase().includes('NEGATIVE') || c4SugarAdulteration === false;
 
-  // Smart contract rules: FSSAI standard (Moisture <= 20%, NMR >= 98%, C4 Sugar NEGATIVE)
+  // Smart contract rules: FSSAI standard
+  // (Moisture <= 20%, NMR >= 98%, C4 Sugar NEGATIVE, HMF < 40, Free acidity <= 40 meq/kg)
   const moisturePass = moisture <= 20.0;
   const nmrPass = nmrScore >= 98.0;
   const hmfPass = hmfVal < 40.0;
-  const overallPass = moisturePass && nmrPass && isC4Negative && hmfPass;
+  const acidityPass = acidityVal == null || acidityVal <= 40.0;
+  const overallPass = moisturePass && nmrPass && isC4Negative && hmfPass && acidityPass;
+
+  // Was this honey already processed by the processor? Then a pass approves it
+  // for manufacturing (QA_APPROVED) instead of certifying the raw harvest.
+  const priorStatus = batch.status;
+  const postProcess = !!batch.production || priorStatus === 'PROCESSED' || priorStatus === 'QA_APPROVED';
+  const testedAt = new Date().toISOString();
 
   batch.qualityTest = {
-    testedAt: new Date().toISOString(),
+    testedAt,
     labName: labName || 'National Bee Board Referral & FSSAI Accredited Honey Lab',
+    tester: tester || 'Lab Tester',
     moisturePercent: moisture,
     nmrPurityScore: nmrScore,
     hmf: hmfVal,
+    acidity: acidityVal,
+    sugarProfile: sugarProfile || null,
     c4SugarAdulteration: isC4Negative ? 'NEGATIVE (< 1.0% C4 Sugar)' : 'POSITIVE (ADULTERATED)',
     c3SugarAdulteration: 'NEGATIVE',
     pollenDominance: pollenDominance || `${batch.honeyType || 'Multifloral'} Pollen Grains`,
     antibioticResidues: antibioticResidues || 'NOT DETECTED (0.0 ppm)',
+    certificate: certificateName || null,
+    result: overallPass ? 'PASS' : 'FAIL',
+    approvedForManufacturing: overallPass && postProcess,
     fssaiCompliance: overallPass ? 'PASSED (FSSAI Reg. 2.8.2 / AGMARK Grade A)' : 'FAILED (Non-compliant)'
   };
 
@@ -58,16 +77,32 @@ testRouter.post('/', (req, res) => {
   batch.smartContractValidations.hmfValidation = hmfPass
     ? `PASS (${hmfVal} mg/kg < 40 mg/kg)`
     : `FAIL (${hmfVal} mg/kg >= 40 mg/kg)`;
+  if (acidityVal != null) {
+    batch.smartContractValidations.acidityValidation = acidityPass
+      ? `PASS (${acidityVal} meq/kg <= 40.0 meq/kg)`
+      : `FAIL (${acidityVal} meq/kg > 40.0 meq/kg)`;
+  }
 
-  batch.status = overallPass ? 'CERTIFIED' : 'REJECTED';
+  batch.status = overallPass ? (postProcess ? 'QA_APPROVED' : 'CERTIFIED') : 'REJECTED';
+  batch.transactions = batch.transactions || [];
+  batch.transactions.push({
+    date: testedAt,
+    event: overallPass ? 'Quality test passed' : 'Quality test failed',
+    actor: 'Tester'
+  });
 
   // Add quality block
   const block = addBlockToChain('QualityCertification', {
     batchId,
+    tester: batch.qualityTest.tester,
+    testedAt,
     moisturePercent: moisture,
     nmrPurityScore: nmrScore,
     hmf: hmfVal,
+    acidity: acidityVal,
+    sugarProfile: batch.qualityTest.sugarProfile,
     overallPass,
+    approvedForManufacturing: batch.qualityTest.approvedForManufacturing,
     status: batch.status
   });
 
@@ -175,9 +210,12 @@ router.get('/history', (req, res) => {
         moisture: parseFloat(qt.moisturePercent || qt.moisture) || null,
         purity: parseFloat(qt.nmrPurityScore || qt.purity) || null,
         hmf: parseFloat(qt.hmf) || null,
+        acidity: qt.acidity != null ? qt.acidity : null,
+        sugarProfile: qt.sugarProfile || null,
         c4Sugar: qt.c4SugarAdulteration || null,
         result: b.status === 'REJECTED' ? 'FAIL' : 'PASS',
-        testedBy: qt.labName || 'Lab Officer',
+        testedBy: qt.tester || qt.labName || 'Lab Officer',
+        approvedForManufacturing: !!qt.approvedForManufacturing,
         date: qt.testedAt || b.harvestDate || 'Unknown',
         status: b.status,
       };

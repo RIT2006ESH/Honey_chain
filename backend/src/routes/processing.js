@@ -14,6 +14,7 @@ router.post('/', (req, res) => {
     date: new Date().toISOString().split('T')[0],
     notes: notes || 'Raw unheated processing compliant with KVIC purity norms'
   };
+  batch.processingSteps = batch.processingSteps || [];
   batch.processingSteps.push(newStep);
 
   if (step?.toLowerCase().includes('packag') || step?.toLowerCase().includes('bottl')) {

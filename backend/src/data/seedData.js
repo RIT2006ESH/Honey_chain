@@ -2,12 +2,12 @@
 // (extracted byte-identical from the original monolithic server.js)
 
 const seedUsers = [
-  { id: 'U001', name: 'System Admin', email: 'admin@honeychain.demo', role: 'ADMIN', cluster: 'All Clusters', status: 'Active', joined: '02 Jan 2026' },
   { id: 'U002', name: 'Ganesh Pawar', email: 'beekeeper@honeychain.demo', role: 'BEEKEEPER', cluster: 'Satara', status: 'Active', joined: '12 Jan 2026' },
   { id: 'U003', name: 'Ramesh Shinde', email: 'ramesh.shinde@honeychain.demo', role: 'BEEKEEPER', cluster: 'Pune / Solapur', status: 'Active', joined: '18 Jan 2026' },
   { id: 'U004', name: 'Suresh More', email: 'suresh.more@honeychain.demo', role: 'BEEKEEPER', cluster: 'Kolhapur', status: 'Invited', joined: '02 Feb 2026' },
-  { id: 'U005', name: 'Dr. Anita Kulkarni', email: 'officer@honeychain.demo', role: 'QUALITY_OFFICER', cluster: 'Satara Lab', status: 'Active', joined: '05 Jan 2026' },
+  { id: 'U005', name: 'Dr. Anita Kulkarni', email: 'tester@honeychain.demo', role: 'TESTER', cluster: 'Satara Lab', status: 'Active', joined: '05 Jan 2026' },
   { id: 'U006', name: 'Vikram Deshmukh', email: 'processor@honeychain.demo', role: 'PROCESSOR', cluster: 'Satara Processing Unit', status: 'Active', joined: '08 Jan 2026' },
+  { id: 'U007', name: 'Nashik Packing Works', email: 'manufacturer@honeychain.demo', role: 'MANUFACTURER', cluster: 'Nashik', status: 'Active', joined: '14 Jan 2026' },
 ];
 
 const sampleBeekeepers = [
@@ -174,8 +174,8 @@ const initialBatch = {
   },
   transactions: [
     { date: '2025-05-10T06:00:00.000Z', event: 'Harvest created', actor: 'Beekeeper' },
-    { date: '2025-05-11T09:00:00.000Z', event: 'Harvest verified', actor: 'Quality Officer' },
-    { date: '2025-05-12T10:30:00.000Z', event: 'Quality test passed', actor: 'Quality Officer' },
+    { date: '2025-05-11T09:00:00.000Z', event: 'Harvest verified', actor: 'Tester' },
+    { date: '2025-05-12T10:30:00.000Z', event: 'Quality test passed', actor: 'Tester' },
     { date: '2025-05-13T08:00:00.000Z', event: 'Processing completed', actor: 'Processor' },
     { date: '2025-05-13T14:00:00.000Z', event: 'Packaged (90 jars)', actor: 'Processor' },
   ]
@@ -190,8 +190,8 @@ const seedBatches = [
     packaging: { jarCount: 74, jarWeight: '500g', sealDate: '2026-07-18' },
     transactions: [
       { date: '2026-07-15T06:00:00.000Z', event: 'Harvest created', actor: 'Beekeeper' },
-      { date: '2026-07-16T09:00:00.000Z', event: 'Harvest verified', actor: 'Quality Officer' },
-      { date: '2026-07-17T10:00:00.000Z', event: 'Quality test passed', actor: 'Quality Officer' },
+      { date: '2026-07-16T09:00:00.000Z', event: 'Harvest verified', actor: 'Tester' },
+      { date: '2026-07-17T10:00:00.000Z', event: 'Quality test passed', actor: 'Tester' },
       { date: '2026-07-18T08:00:00.000Z', event: 'Packaged (74 jars)', actor: 'Processor' },
     ]
   },
@@ -201,8 +201,8 @@ const seedBatches = [
     status: 'CERTIFIED', qualityTest: { testedAt: '2026-08-04T11:00:00Z', moisturePercent: 18.5, nmrPurityScore: 98.8, hmf: 15.0, c4SugarAdulteration: 'NEGATIVE' },
     transactions: [
       { date: '2026-08-02T06:30:00.000Z', event: 'Harvest created', actor: 'Beekeeper' },
-      { date: '2026-08-03T09:00:00.000Z', event: 'Harvest verified', actor: 'Quality Officer' },
-      { date: '2026-08-04T11:00:00.000Z', event: 'Quality test passed', actor: 'Quality Officer' },
+      { date: '2026-08-03T09:00:00.000Z', event: 'Harvest verified', actor: 'Tester' },
+      { date: '2026-08-04T11:00:00.000Z', event: 'Quality test passed', actor: 'Tester' },
     ]
   },
   {
@@ -212,8 +212,8 @@ const seedBatches = [
     processing: { extractionUnit: 'SS Centrifugal Extractor — Unit B', outputQuantity: 50.5 },
     transactions: [
       { date: '2026-08-20T05:45:00.000Z', event: 'Harvest created', actor: 'Beekeeper' },
-      { date: '2026-08-21T09:00:00.000Z', event: 'Harvest verified', actor: 'Quality Officer' },
-      { date: '2026-08-22T10:00:00.000Z', event: 'Quality test passed', actor: 'Quality Officer' },
+      { date: '2026-08-21T09:00:00.000Z', event: 'Harvest verified', actor: 'Tester' },
+      { date: '2026-08-22T10:00:00.000Z', event: 'Quality test passed', actor: 'Tester' },
       { date: '2026-08-23T08:00:00.000Z', event: 'Processing completed', actor: 'Processor' },
     ]
   },
@@ -231,7 +231,7 @@ const seedBatches = [
     status: 'HARVEST_VERIFIED',
     transactions: [
       { date: '2026-09-10T06:00:00.000Z', event: 'Harvest created', actor: 'Beekeeper' },
-      { date: '2026-09-11T09:00:00.000Z', event: 'Harvest verified', actor: 'Quality Officer' },
+      { date: '2026-09-11T09:00:00.000Z', event: 'Harvest verified', actor: 'Tester' },
     ]
   },
 ];

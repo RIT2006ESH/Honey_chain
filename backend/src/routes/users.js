@@ -19,9 +19,6 @@ router.post('/', (req, res) => {
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
   if (!users[id]) return res.status(404).json({ ok: false, error: 'User not found' });
-  if (users[id].role === 'ADMIN' && Object.values(users).filter(u => u.role === 'ADMIN').length <= 1) {
-    return res.status(400).json({ ok: false, error: 'Cannot remove the last admin' });
-  }
   delete users[id];
   res.json({ ok: true });
 });

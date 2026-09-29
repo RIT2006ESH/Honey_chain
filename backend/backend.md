@@ -140,7 +140,7 @@ backend/
 | `src/app.js` | 21 | `express()` + `cors()` + `bodyParser.json()`, mounts `./routes` at `/api`, then a catch-all `404 { ok:false, error:'Route not found' }` for everything else. |
 | `src/routes/index.js` | 33 | The router registry — see the mount table below. |
 | `src/routes/auth.js` | 18 | `POST /login`. Hardcoded email → role map. |
-| `src/routes/users.js` | 28 | `GET/POST /`, `DELETE /:id`. Refuses to delete the last `ADMIN`. |
+| `src/routes/users.js` | 26 | `GET/POST /`, `DELETE /:id`. |
 | `src/routes/beekeepers.js` | 32 | `GET/POST /`. Generates `KVIC-BK-1xx` ids, stamps `verified: true`, writes a `BeekeeperEnrolled` block. |
 | `src/routes/hives.js` | 94 | `GET /`, `GET /:hiveId`, `POST /` (register), `POST /:hiveId/telemetry` (ingest + alert engine). |
 | `src/routes/ai.js` | 84 | `POST /diagnose`, `POST /predict-yield`. Keyword/symptom matching and a per-floral-source yield table. |
@@ -299,7 +299,8 @@ Batches in `PACKAGED` or `DISPATCHED`, sorted newest-first by first transaction 
 
 ```json
 { "ok": true, "inventory": [ { "id", "hiveId", "honeyType", "quantity", "status",
-                              "processing", "packaging", "dispatch",
+                              "processing", "production", "productionBatchId",
+                              "packaging", "dispatch",
                               "beekeeper", "createdAt" } ] }
 ```
 
@@ -316,10 +317,10 @@ Body: `{ email }` — **no password field is read.**
 
 | Email | Role | Name |
 |---|---|---|
-| `admin@honeychain.demo` | `ADMIN` | Admin User |
 | `beekeeper@honeychain.demo` | `BEEKEEPER` | Rameshwar Verma |
-| `officer@honeychain.demo` | `QUALITY_OFFICER` | Dr. Sharma |
 | `processor@honeychain.demo` | `PROCESSOR` | Satara Processing Unit |
+| `tester@honeychain.demo` | `TESTER` | Dr. Sharma |
+| `manufacturer@honeychain.demo` | `MANUFACTURER` | Nashik Packing Works |
 
 ```json
 { "ok": true, "user": { "email": "...", "role": "BEEKEEPER", "name": "Rameshwar Verma" } }
@@ -338,8 +339,7 @@ Body: `{ name, email, role, cluster? }` — all of `name`/`email`/`role` require
 Creates `{ id: "U00N", name, email, role, cluster, status: "Invited", joined: "DD Mon YYYY" }`.
 
 #### `DELETE /api/users/:id`
-`404 { error: 'User not found' }` if absent. Blocks the last admin:
-`400 { error: 'Cannot remove the last admin' }`. Otherwise `{ ok: true }`.
+`404 { error: 'User not found' }` if absent, otherwise `{ ok: true }`.
 
 ### 6.4 Beekeepers
 
@@ -445,7 +445,7 @@ Falls back to the first beekeeper and first hive if the ids don't resolve.
 
 #### `POST /api/quality-test` — the smart-contract gate
 
-Body: `{ batchId, labName, moisturePercent, nmrPurityScore, c4SugarAdulteration, hmf, pollenDominance, antibioticResidues }`.
+Body: `{ batchId, labName, tester, moisturePercent, nmrPurityScore, c4SugarAdulteration, hmf, acidity, sugarProfile, pollenDominance, antibioticResidues, certificateName }`.
 
 Defaults when a field is absent: moisture `18.0`, NMR `99.2`, HMF `14.0`, C4 `NEGATIVE`.
 A batch that doesn't exist → `404 { error: 'Batch not found' }`.
@@ -458,13 +458,23 @@ A batch that doesn't exist → `404 { error: 'Batch not found' }`.
 | NMR purity | ≥ 98.0 % | `PASS (${n}% >= 98.0%)` / `FAIL (… < 98.0%)` |
 | C4 sugar | NEGATIVE | `PASS (100% Pure Raw Honey)` / `FAIL (C4 Foreign Sugar Detected)` |
 | HMF | < 40.0 mg/kg | `PASS (… < 40 mg/kg)` / `FAIL (… >= 40 mg/kg)` |
+| Free acidity | ≤ 40.0 meq/kg (only when `acidity` supplied) | `PASS (… <= 40.0 meq/kg)` / `FAIL (… > 40.0 meq/kg)` |
 
-`overallPass = moisturePass && nmrPass && isC4Negative && hmfPass`.
+`overallPass = moisturePass && nmrPass && isC4Negative && hmfPass && acidityPass`.
 
-On success it writes `batch.qualityTest` (9 fields incl. `fssaiCompliance`:
-`PASSED (FSSAI Reg. 2.8.2 / AGMARK Grade A)`), overwrites all four
-`smartContractValidations`, and sets `batch.status = 'CERTIFIED'` or `'REJECTED'`.
-**Writes a `QualityCertification` block** and returns `{ ok, batch, block }`.
+**Status outcome depends on whether the batch was already processed:**
+
+- **Processed honey** (`batch.production` exists, or status `PROCESSED` / `QA_APPROVED`) —
+  the tester is approving it for manufacturing: pass → `QA_APPROVED`,
+  fail → `REJECTED`. Sets `qualityTest.approvedForManufacturing = true` on a pass.
+- **Raw honey** (legacy pre-processing path) — pass → `CERTIFIED`, fail → `REJECTED`.
+
+On success it writes `batch.qualityTest` (incl. `tester`, `testedAt`, `acidity`,
+`sugarProfile`, `certificate`, `result: PASS|FAIL`, `approvedForManufacturing`,
+`fssaiCompliance`), overwrites all five `smartContractValidations`, appends a
+`Quality test passed` / `Quality test failed` transaction (actor `Tester`), and
+**writes a `QualityCertification` block** carrying `tester`, `testedAt`, `acidity`,
+`sugarProfile` and `approvedForManufacturing`. Returns `{ ok, batch, block }`.
 
 > ⚠️ This reads `qualityStandards` from the store but never consults it — the thresholds are
 > hardcoded FSSAI values. Editing `/api/quality/standards` has **no effect** on the gate.
@@ -537,7 +547,40 @@ Generates `id = HC-MH-2026-00${random 100–999}` and creates:
 
 **Writes a `HARVEST_CREATED` block** carrying the whole batch object.
 
-#### `POST /api/batches/:id/verify` — quality officer
+#### `POST /api/batches/:id/handoff` — beekeeper sends the honey to the processor
+Body: `{ sender?, receiver?, note? }` (all optional).
+
+Only allowed while the batch is still pre-processing
+(`HARVEST_CREATED` / `HARVEST_VERIFIED` / `QUALITY_VERIFIED` / `CERTIFIED`) and has not been
+handed over before:
+
+- `404 { error: 'Batch not found' }` if absent ·
+  `400 { error: 'Batch has already been sent to the processor' }` on a repeat ·
+  `400 { error: 'Batch is already with the processor' }` once processing has started.
+
+On success sets `batch.handoff = { sentAt, sender, receiver, status: 'IN_TRANSIT', note }`,
+appends a `Sent to processor` transaction (actor `Beekeeper`), and
+**writes a `HANDOFF_TO_PROCESSOR` block** `{ batchId, hiveId, sender, receiver, quantity, sentAt }`.
+The batch `status` is unchanged — the tester pipeline still gates it before the processor's
+"Ready for Processing" list picks it up.
+
+#### `POST /api/batches/:id/receive` — processor accepts the consignment
+Body: `{ receiver?, acceptedQuantity?, note? }` (all optional).
+
+- `404 { error: 'Batch not found' }` if absent ·
+  `400 { error: 'No consignment from a beekeeper is recorded for this batch' }` if the batch
+  was never handed over ·
+  `400 { error: 'Batch has already been received' }` on a repeat.
+
+On success sets `batch.received = { receivedAt, receiver, acceptedQuantity, note }`
+(default `acceptedQuantity` = `batch.quantity`), appends a `Received by processor`
+transaction (actor `Processor`), and **writes a `RECEIVED_BY_PROCESSOR` block**
+`{ batchId, receiver, acceptedQuantity, receivedAt }`. `status` is unchanged.
+
+A batch that has a `handoff` but no `received` record is **blocked from processing** —
+`POST /:id/process` returns `400 { error: 'Receive the beekeeper consignment before processing' }`.
+
+#### `POST /api/batches/:id/verify` — tester
 → `status = 'HARVEST_VERIFIED'`, appends a transaction, writes `HARVEST_VERIFIED`.
 
 #### `POST /api/batches/:id/quality` — **legacy, superseded**
@@ -546,20 +589,51 @@ Body stored verbatim on `batch.quality`; `status = 'QUALITY_VERIFIED'`; writes
 `POST /api/quality-test` for the real gate. No frontend caller reaches this.
 
 #### `POST /api/batches/:id/process` — processor
-Body `{ center, qtyProcessed }` stored on `batch.processing`; `status = 'PROCESSED'`;
-writes `PROCESSED`.
+Body is **merged** into `batch.processing = { ...existing, ...body }`, so a partial payload
+(e.g. `{ startedAt }` from IncomingBatches or `{ center, qtyProcessed }` from the overview
+form) never wipes extraction/filtration details recorded by `ProcessingLog.jsx`.
 
-#### `POST /api/batches/:id/package`
-`status = 'PACKAGED'`; appends **two** transactions (*Package registered*, *QR generated*);
-writes `PACKAGED`. The QR image is **not** generated here — see `GET /api/qr/:batchId`.
-
-#### `POST /api/batches/:id/packaging` — the richer variant
-Body: `{ packagedBatchId, jarCount, jarWeight, sealDate, bestBefore, packagingType }`.
+Every call also creates-or-updates the **production batch record**:
 
 ```json
-"packaging": { "packagedBatchId": "PKG-…", "jarCount": 74, "jarWeight": "500g",
-               "sealDate": "…", "bestBefore": "+365 days", "packagingType": "Glass Jar with Tamper-Evident Seal" }
+"productionBatchId": "PB-<batch id>",
+"production": { "productionBatchId": "PB-…", "createdAt": "…", "updatedAt": "…",
+                "location": "<processor|center>", "processedAt": "…",
+                "inputQuantity": 12.5, "outputQuantity": 11.8,
+                "filtration": { "method": "…", "settlingHours": 24 } }
 ```
+
+`inputQuantity` falls back to `qtyProcessed`, then `batch.quantity`; `location` prefers
+`processor`, then `center`; `filtration` persists once set. Packaging later syncs
+`production = { …, packagedBatchId, jarCount, finalQuantityKg, packagedAt, packagedLocation }`.
+
+`status = 'PROCESSED'`; appends a `Processing completed` transaction (actor `Processor`);
+writes `PROCESSED`. Packaging and dispatch transactions use actor `Manufacturer`.
+
+#### `POST /api/batches/:id/package`
+`400 { error: 'Batch must be QA-approved by the tester before packaging' }` unless
+`status === 'QA_APPROVED'`. Otherwise `status = 'PACKAGED'`; builds the packaging record
+via the shared `applyPackaging()` helper (see `/packaging` below), appends **two**
+transactions (*Package registered*, *QR generated*); writes `PACKAGED`.
+The QR image is **not** generated here — see `GET /api/qr/:batchId`.
+
+#### `POST /api/batches/:id/packaging` — the richer variant
+Body: `{ packagedBatchId, jarCount, jarWeight, sealDate, bestBefore, packagingType, location, notes }`.
+
+```json
+"packaging": { "packagedBatchId": "PKG-…", "jarCount": 18, "jarWeight": "500g",
+               "finalQuantityKg": 9, "sealDate": "2026-09-30",
+               "packagedAt": "<now ISO>", "location": "Nashik Packing Works",
+               "bestBefore": "+365 days", "packagingType": "Glass Jar with Tamper-Evident Seal" }
+```
+
+`packagedBatchId` defaults to `PKG-<productionBatchId>` (falling back to `PKG-<batch id>`);
+`finalQuantityKg` is computed from `jarCount × jarWeight` (parses `500g` / `1kg`);
+`location` defaults to `Nashik Packing Works`; `packagedAt` is stamped on first packaging
+and kept on re-packaging. Fields merge with any previously stored packaging record.
+Both packaging routes refuse
+non-`QA_APPROVED` batches with `400 { error: 'Batch must be QA-approved by the tester before packaging' }`
+and sync `batch.production = { …, packagedBatchId, jarCount, updatedAt }`.
 
 `status = 'PACKAGED'`; writes `PACKAGED` with `{ batchId, jarCount, sealDate }`.
 > ⚠️ Despite the similar names, `/package` and `/packaging` are **independent routes that
@@ -697,6 +771,8 @@ persistence** — it is an append-only audit log with tamper-evidence, not a dis
 | `COUNTERFEIT_REPORT` | `POST /api/reports` |
 | `HARVEST_CREATED` | `POST /api/batches` |
 | `HARVEST_VERIFIED` | `POST /api/batches/:id/verify` |
+| `HANDOFF_TO_PROCESSOR` | `POST /api/batches/:id/handoff` |
+| `RECEIVED_BY_PROCESSOR` | `POST /api/batches/:id/receive` |
 | `QUALITY_VERIFIED` | `POST /api/batches/:id/quality` |
 | `PROCESSED` | `POST /api/batches/:id/process` |
 | `PACKAGED` | `POST /api/batches/:id/package` and `/:id/packaging` |
@@ -761,10 +837,14 @@ Two overlapping sets, with no single enum enforcing them:
 
 | Set | Values | Source |
 |---|---|---|
-| `harvest-event` / `quality-test` | `HARVESTED` → `CERTIFIED` / `REJECTED` → `PACKAGED` | `harvest.js`, `quality.js` |
-| `batches.js` | `HARVEST_CREATED` → `HARVEST_VERIFIED` → `QUALITY_VERIFIED` → `PROCESSED` → `PACKAGED` → `DISPATCHED` | `batches.js` |
+| `harvest-event` / `quality-test` (raw) | `HARVESTED` → `CERTIFIED` / `REJECTED` → `PACKAGED` | `harvest.js`, `quality.js` |
+| `batches.js` (live 4-role pipeline) | `HARVEST_CREATED` → `HARVEST_VERIFIED` → `PROCESSED` → `QA_APPROVED` → `PACKAGED` → `DISPATCHED` | `batches.js`, `quality.js` |
 
-`REJECTED` is the only value shared with no transition back out of it.
+`QA_APPROVED` is set by `POST /api/quality-test` when a **processed** batch passes — it is
+the tester's approval for manufacturing, and both packaging routes refuse any other status.
+`REJECTED` can return to the flow only by re-testing (`/api/quality-test`).
+`QUALITY_VERIFIED` / `CERTIFIED` are legacy pre-processing values kept for seed data and
+the raw-honey test path.
 
 ### 8.3 Telemetry model
 
@@ -791,7 +871,7 @@ comments document the acceptable ranges.
 
 | Collection | Count | Notes |
 |---|---|---|
-| `seedUsers` | 6 | 1 admin, 3 beekeepers (1 `Invited`), 1 quality officer, 1 processor |
+| `seedUsers` | 6 | 3 beekeepers (1 `Invited`), 1 tester, 1 processor, 1 manufacturer |
 | `sampleBeekeepers` | 3 | Bihar, West Bengal, Punjab — each with a `geoZone` bounding box |
 | `sampleHives` | 3 | Tied to the 3 beekeepers; one in each health state |
 | `initialBatch` | 1 | `HONEY-BATCH-2025-001`, `CERTIFIED`, 45 kg, 99.4 % NMR, 90 jars, full `processingSteps` + 5 transactions |
@@ -837,7 +917,7 @@ data's comment (450) — pick one.
 
 | Rule | Where |
 |---|---|
-| Cannot delete the last `ADMIN` | `users.js` |
+| Hive review requires a signed-in role header (`x-user-role` ∈ the four roles) | `hives.js` |
 | `key` must exist before a standard can be patched | `quality.js` |
 | Packaging step only promotes `CERTIFIED → PACKAGED` (not from `REJECTED`) | `processing.js` |
 | C4-sugar check accepts `false`, `"NEGATIVE"`, or any string containing it | `quality.js` |
@@ -865,15 +945,19 @@ endpoints — and where the map is incomplete.
 | # | Checkpoint | Endpoint | Block type | Status written |
 |---|---|---|---|---|
 | 1 | **Harvest** | `POST /api/harvest-event` **or** `POST /api/batches` | `HarvestEvent` / `HARVEST_CREATED` | `HARVESTED` / `HARVEST_CREATED` |
-| 2 | **Lab Test** | `POST /api/quality-test` | `QualityCertification` | `CERTIFIED` / `REJECTED` |
-| 3 | **Processing** | `POST /api/batches/:id/process` **or** `POST /api/processing-step` | `PROCESSED` / `ProcessingStep` | `PROCESSED` / — |
-| 4 | **Packaging** | `POST /api/batches/:id/packaging` **or** `/:id/package` | `PACKAGED` | `PACKAGED` |
+| 2 | **Processing** | `POST /api/batches/:id/process` **or** `POST /api/processing-step` | `PROCESSED` / `ProcessingStep` | `PROCESSED` / — |
+| 3 | **Lab Test** | `POST /api/quality-test` | `QualityCertification` | `QA_APPROVED` / `REJECTED` (raw path: `CERTIFIED`) |
+| 4 | **Packaging** | `POST /api/batches/:id/packaging` **or** `/:id/package` | `PACKAGED` | `PACKAGED` (refuses non-`QA_APPROVED`) |
 | 5 | **Distribution** | `POST /api/batches/:id/dispatch` | `DISPATCHED` | `DISPATCHED` |
 | 6 | **Retail** | — | — | ✗ **not implemented** |
 
 Steps 1, 3, and 4 each have **two competing endpoints** with different payload shapes.
 Step 6 does not exist. The frontend compensates by maintaining its own parallel status
 strings in `AppContext` and by treating batches as loosely-typed.
+
+Two internal transfer checkpoints sit outside the six: `POST /:id/handoff`
+(`HANDOFF_TO_PROCESSOR`) and `POST /:id/receive` (`RECEIVED_BY_PROCESSOR`). Neither changes
+`status`, but `/process` refuses a handed-over batch until it has been received.
 
 **Consumer-facing view:** `GET /api/provenance/:batchId` reassembles all of the above into a
 single `HoneyTraceabilityBundle`, and `GET /api/qr/:batchId` renders it as a scannable label.
@@ -884,12 +968,14 @@ single `HoneyTraceabilityBundle`, and `GET /api/qr/:batchId` renders it as a sca
 
 ### Four roles
 
+Supply-chain order: **beekeeper → processor → tester → manufacturer.**
+
 | Role | Seed user | Scope |
 |---|---|---|
-| `ADMIN` | U001 System Admin | Users, settings, reports, activity |
 | `BEEKEEPER` | U002 Ganesh Pawar | Own batches, harvest submission, alerts, earnings |
-| `QUALITY_OFFICER` | U005 Dr. Anita Kulkarni | Verification, lab tests, standards, trends, rejections |
-| `PROCESSOR` | U006 Vikram Deshmukh | Incoming, processing, packaging, inventory, dispatch, facility |
+| `PROCESSOR` | U006 Vikram Deshmukh | Incoming, processing |
+| `TESTER` | U005 Dr. Anita Kulkarni | Verification, lab tests, standards, trends, rejections |
+| `MANUFACTURER` | U007 Nashik Packing Works | Packaging, inventory, dispatch, blockchain, consumer scan |
 
 Plus **CONSUMER**, which has **no account and no role** — the public verification path
 (`/api/provenance`, `/api/qr`, `POST /api/reports`) is deliberately unauthenticated.
@@ -1037,7 +1123,7 @@ process is degraded.
     - Batch lifecycle: each transition writes the expected status and the expected block.
     - Chain integrity: `block[i].previousHash === block[i-1].hash` after a mutation sequence.
     - `provenance/:batchId` fallback behaviour on a sparse batch.
-    - `POST /api/auth/login` for all 5 email cases including the rejection path.
+    - `POST /api/auth/login` for all 4 email cases including the rejection path.
     Remember `store.js` seeds on import, so every suite starts from the seeded state — reset
     the module registry between tests.
 
